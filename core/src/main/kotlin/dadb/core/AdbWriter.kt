@@ -7,6 +7,24 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
 
     private val bufferedSink = sink.buffer()
 
+    fun writeConnect() = write(
+            Constants.CMD_CNXN,
+            Constants.CONNECT_VERSION,
+            Constants.CONNECT_MAXDATA,
+            Constants.CONNECT_PAYLOAD,
+            0,
+            Constants.CONNECT_PAYLOAD.size
+    )
+
+    fun writeAuth(signature: ByteArray) = write(
+            Constants.CMD_AUTH,
+            Constants.AUTH_TYPE_SIGNATURE,
+            0,
+            signature,
+            0,
+            signature.size
+    )
+
     fun write(
             command: Int,
             arg0: Int,
