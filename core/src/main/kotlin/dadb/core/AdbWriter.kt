@@ -16,13 +16,13 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
             Constants.CONNECT_PAYLOAD.size
     )
 
-    fun writeAuth(signature: ByteArray) = write(
+    fun writeAuth(authType: Int, authPayload: ByteArray) = write(
             Constants.CMD_AUTH,
-            Constants.AUTH_TYPE_SIGNATURE,
+            authType,
             0,
-            signature,
+            authPayload,
             0,
-            signature.size
+            authPayload.size
     )
 
     fun write(

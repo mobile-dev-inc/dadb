@@ -3,7 +3,6 @@ package dadb.core
 import okio.Sink
 import okio.Source
 import java.io.IOException
-import java.security.KeyPair
 
 class AdbChannel private constructor(
         private val adbReader: AdbReader,
@@ -15,12 +14,12 @@ class AdbChannel private constructor(
 
     companion object {
 
-        fun connect(source: Source, sink: Sink, keyPair: KeyPair? = null) {
+        fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null): AdbChannel {
             val adbReader = AdbReader(source)
             val adbWriter = AdbWriter(sink)
 
             try {
-                connect(adbReader, adbWriter, keyPair)
+                return connect(adbReader, adbWriter, keyPair)
             } catch (t: Throwable) {
                 adbReader.close()
                 adbWriter.close()
@@ -28,7 +27,7 @@ class AdbChannel private constructor(
             }
         }
 
-        private fun connect(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: KeyPair?): AdbChannel {
+        private fun connect(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair?): AdbChannel {
             adbWriter.writeConnect()
 
             var message = adbReader.readMessage()
@@ -37,12 +36,13 @@ class AdbChannel private constructor(
                 if (keyPair == null) throw IllegalStateException("Authentication required but no KeyPair provided")
                 if (message.arg0 != Constants.AUTH_TYPE_TOKEN) throw IllegalStateException("Unsupported auth type: $message")
 
-                val signature = AuthUtils.signPayload(keyPair.private, message)
-                adbWriter.writeAuth(signature)
+                val signature = keyPair.signPayload(message)
+                adbWriter.writeAuth(Constants.AUTH_TYPE_SIGNATURE, signature)
 
                 message = adbReader.readMessage()
                 if (message.command == Constants.CMD_AUTH) {
-                    throw IllegalStateException("Public key authentication unimplemented")
+                    adbWriter.writeAuth(Constants.AUTH_TYPE_RSA_PUBLIC, keyPair.publicKeyBytes)
+                    message = adbReader.readMessage()
                 }
             }
 
