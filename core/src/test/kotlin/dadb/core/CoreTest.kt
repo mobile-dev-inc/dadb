@@ -1,7 +1,5 @@
 package dadb.core
 
-import okio.sink
-import okio.source
 import org.junit.Before
 import java.net.Socket
 import kotlin.test.Test
@@ -17,9 +15,7 @@ internal class CoreTest {
     @Test
     fun name() {
         val socket = Socket("localhost", 5555)
-        val adbSource = socket.source()
-        val adbSink = socket.sink()
         val keyPair = AdbKeyPair.readDefault()
-        println(AdbChannel.connect(adbSource, adbSink, keyPair))
+        AdbChannel.connect(socket, keyPair).close()
     }
 }

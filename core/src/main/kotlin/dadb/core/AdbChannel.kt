@@ -2,24 +2,43 @@ package dadb.core
 
 import okio.Sink
 import okio.Source
+import okio.sink
+import okio.source
+import java.io.Closeable
 import java.io.IOException
+import java.net.Socket
 
 class AdbChannel private constructor(
         private val adbReader: AdbReader,
         private val adbWriter: AdbWriter,
+        private val closeable: Closeable?,
         private val connectionString: String,
         private val version: Int,
         private val maxPayloadSize: Int
-) {
+) : AutoCloseable {
+
+    override fun close() {
+        try {
+            adbReader.close()
+            adbWriter.close()
+            closeable?.close()
+        } catch (ignore: Throwable) {}
+    }
 
     companion object {
 
-        fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null): AdbChannel {
+        fun connect(socket: Socket, keyPair: AdbKeyPair? = null): AdbChannel {
+            val source = socket.source()
+            val sink = socket.sink()
+            return connect(source, sink, keyPair, socket)
+        }
+
+        private fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null, closeable: Closeable? = null): AdbChannel {
             val adbReader = AdbReader(source)
             val adbWriter = AdbWriter(sink)
 
             try {
-                return connect(adbReader, adbWriter, keyPair)
+                return connect(adbReader, adbWriter, keyPair, closeable)
             } catch (t: Throwable) {
                 adbReader.close()
                 adbWriter.close()
@@ -27,7 +46,7 @@ class AdbChannel private constructor(
             }
         }
 
-        private fun connect(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair?): AdbChannel {
+        private fun connect(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair?, closeable: Closeable?): AdbChannel {
             adbWriter.writeConnect()
 
             var message = adbReader.readMessage()
@@ -52,7 +71,7 @@ class AdbChannel private constructor(
             val version = message.arg0
             val maxPayloadSize = message.arg1
 
-            return AdbChannel(adbReader, adbWriter, connectionString, version, maxPayloadSize)
+            return AdbChannel(adbReader, adbWriter, closeable, connectionString, version, maxPayloadSize)
         }
     }
 }
