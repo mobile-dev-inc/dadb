@@ -1,4 +1,4 @@
-package dadb.core
+package dadb
 
 import okio.Source
 import okio.buffer

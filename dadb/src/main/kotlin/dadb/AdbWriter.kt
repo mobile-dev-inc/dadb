@@ -1,4 +1,4 @@
-package dadb.core
+package dadb
 
 import okio.Sink
 import okio.buffer

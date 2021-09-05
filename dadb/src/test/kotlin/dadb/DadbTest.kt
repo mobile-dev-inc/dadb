@@ -1,10 +1,10 @@
-package dadb.core
+package dadb
 
 import org.junit.Before
 import java.net.Socket
 import kotlin.test.Test
 
-internal class CoreTest {
+internal class DadbTest {
 
     @Before
     fun setUp() {

@@ -1,4 +1,4 @@
-package dadb.core
+package dadb
 
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.jce.provider.BouncyCastleProvider

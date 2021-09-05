@@ -1,4 +1,4 @@
-package dadb.core
+package dadb
 
 internal class AdbMessage(
         val command: Int,
