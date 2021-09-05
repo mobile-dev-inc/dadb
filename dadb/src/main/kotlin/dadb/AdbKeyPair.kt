@@ -25,7 +25,6 @@ class AdbKeyPair(
 
         private const val KEY_LENGTH_BITS = 2048
         private const val KEY_LENGTH_BYTES = KEY_LENGTH_BITS / 8
-        private const val KEY_LENGTH_WORDS = KEY_LENGTH_BYTES / 4
 
         private val SIGNATURE_PADDING = ubyteArrayOf(
                 0x00u, 0x01u, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu,
