@@ -11,7 +11,7 @@ import javax.crypto.Cipher
 
 class AdbKeyPair(
         private val privateKey: PrivateKey,
-        val publicKeyBytes: ByteArray
+        internal val publicKeyBytes: ByteArray
 ) {
 
     internal fun signPayload(message: AdbMessage): ByteArray {
