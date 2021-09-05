@@ -1,4 +1,4 @@
-package dadb
+package dadb.core
 
 internal object Constants {
 
