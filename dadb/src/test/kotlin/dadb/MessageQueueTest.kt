@@ -1,10 +1,8 @@
 package dadb
 
 import com.google.common.truth.Truth
-import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.concurrent.thread
 import kotlin.test.Test
 
 internal class MessageQueueTest {
@@ -12,27 +10,27 @@ internal class MessageQueueTest {
     @Test
     fun basic() {
         val messageQueue = TestMessageQueue()
-        messageQueue.registerType(0)
+        messageQueue.startListening(0)
         messageQueue.sendMessage(0)
 
-        Truth.assertThat(messageQueue.take(0)).isEqualTo(0)
+        Truth.assertThat(messageQueue.take(0, 0)).isEqualTo(0)
     }
 
     @Test
     fun multipleTypes() {
         val messageQueue = TestMessageQueue()
-        messageQueue.registerType(0)
-        messageQueue.registerType(1)
+        messageQueue.startListening(0)
+        messageQueue.startListening(1)
         messageQueue.sendMessage(0)
         messageQueue.sendMessage(1)
 
-        Truth.assertThat(messageQueue.take(0)).isEqualTo(0)
-        Truth.assertThat(messageQueue.take(1)).isEqualTo(1)
+        Truth.assertThat(messageQueue.take(0, 0)).isEqualTo(0)
+        Truth.assertThat(messageQueue.take(1, 0)).isEqualTo(1)
     }
 
     @Test
     fun concurrency1() {
-        concurrency1({ messageQueue, type -> messageQueue.take(type) }) { messageQueue, futures ->
+        concurrency1({ messageQueue, type -> messageQueue.take(type, 0) }) { messageQueue, futures ->
             Truth.assertThat(messageQueue.readCount.get()).isEqualTo(100)
             waitFor(futures)
         }
@@ -55,7 +53,7 @@ internal class MessageQueueTest {
 
     @Test
     fun concurrency2() {
-        concurrency2({ messageQueue, type -> messageQueue.take(type) }) { messageQueue, futures ->
+        concurrency2({ messageQueue, type -> messageQueue.take(type, 0) }) { messageQueue, futures ->
             Truth.assertThat(messageQueue.readCount.get()).isEqualTo(2)
             waitFor(futures)
         }
@@ -77,14 +75,14 @@ internal class MessageQueueTest {
     }
 
     private fun concurrency1(
-            take: (messageQueue: TestMessageQueue, type: Long) -> Long,
+            take: (messageQueue: TestMessageQueue, type: Int) -> Int,
             assertions: (messageQueue: TestMessageQueue, futures: List<CompletableFuture<Void>>) -> Unit
     ) {
         val messageQueue = TestMessageQueue()
-        messageQueue.registerType(0)
-        messageQueue.registerType(1)
+        messageQueue.startListening(0)
+        messageQueue.startListening(1)
 
-        val futures = listOf(0L, 1L).flatMap { type ->
+        val futures = listOf(0, 1).flatMap { type ->
             (0 until 50).map {
                 CompletableFuture.runAsync {
                     Truth.assertThat(take(messageQueue, type)).isEqualTo(type)
@@ -94,7 +92,7 @@ internal class MessageQueueTest {
 
         Thread.sleep(500)
 
-        (0 until 100).forEach { i -> messageQueue.sendMessage((i % 2).toLong())}
+        (0 until 100).forEach { i -> messageQueue.sendMessage(i % 2)}
 
         Thread.sleep(500)
 
@@ -102,12 +100,12 @@ internal class MessageQueueTest {
     }
 
     private fun concurrency2(
-            take: (messageQueue: TestMessageQueue, type: Long) -> Long,
+            take: (messageQueue: TestMessageQueue, type: Int) -> Int,
             assertions: (messageQueue: TestMessageQueue, futures: List<CompletableFuture<Void>>) -> Unit
     ) {
         val messageQueue = TestMessageQueue()
-        messageQueue.registerType(0)
-        messageQueue.registerType(1)
+        messageQueue.startListening(0)
+        messageQueue.startListening(1)
 
         (0 until 50).map {
             CompletableFuture.runAsync {
@@ -144,36 +142,38 @@ internal class MessageQueueTest {
     }
 }
 
-private class TestMessageQueue : MessageQueue<Long>() {
+private class TestMessageQueue : MessageQueue<Int>() {
 
-    private val readQueue = LinkedBlockingDeque<Long>()
+    private val readQueue = LinkedBlockingDeque<Int>()
 
     val readCount = AtomicInteger(0)
 
-    fun sendMessage(message: Long) {
+    fun sendMessage(message: Int) {
         readQueue.add(message)
     }
 
-    fun takeUnsafe1(type: Long): Long {
+    fun takeUnsafe1(type: Int): Int {
         while (true) {
-            poll(type)?.let { return it }
+            poll(type, 0)?.let { return it }
             read()
         }
     }
 
-    fun takeUnsafe2(type: Long): Long {
+    fun takeUnsafe2(type: Int): Int {
         while (true) {
             synchronized(this) {
-                poll(type)?.let { return it }
+                poll(type, 0)?.let { return it }
                 read()
             }
         }
     }
 
-    override fun readMessage(): Long {
+    override fun readMessage(): Int {
         readCount.incrementAndGet()
         return readQueue.take()
     }
 
-    override fun getType(v: Long) = v
+    override fun getConnectionId(message: Int) = message
+
+    override fun getCommand(message: Int) = 0
 }

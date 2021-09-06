@@ -17,6 +17,8 @@ class AdbChannel private constructor(
         private val maxPayloadSize: Int
 ) : AutoCloseable {
 
+    private val messageQueue = AdbMessageQueue(adbReader)
+
     override fun close() {
         try {
             adbReader.close()

@@ -11,12 +11,12 @@ internal abstract class MessageQueue<V> {
     private val readLock = ReentrantLock()
     private val queueLock = ReentrantLock()
     private val queueCond = queueLock.newCondition()
-    private val queues = ConcurrentHashMap<Long, Queue<V>>()
+    private val queues = ConcurrentHashMap<Int, ConcurrentHashMap<Int, Queue<V>>>()
 
-    fun take(type: Long): V {
+    fun take(connectionId: Int, command: Int): V {
         while (true) {
             queueLock.lock {
-                poll(type)?.let { return it }
+                poll(connectionId, command)?.let { return it }
                 readLock.tryLock ({
                     queueLock.unlock()
                     read()
@@ -27,29 +27,36 @@ internal abstract class MessageQueue<V> {
         }
     }
 
-    fun registerType(type: Long) {
-        queues.putIfAbsent(type, ConcurrentLinkedQueue())
+    fun startListening(connectionId: Int) {
+        queues.putIfAbsent(connectionId, ConcurrentHashMap())
     }
 
-    fun unregisterType(type: Long) {
-        queues.remove(type)
+    fun stopListening(connectionId: Int) {
+        queues.remove(connectionId)
     }
 
     protected abstract fun readMessage(): V
 
-    protected abstract fun getType(v: V): Long
+    protected abstract fun getConnectionId(message: V): Int
+
+    protected abstract fun getCommand(message: V): Int
 
     @TestOnly
-    protected fun poll(type: Long): V? {
-        val queue = queues[type] ?: throw IllegalStateException(String.format(Locale.US, "Type has not been registered: %x", type))
-        return queue.poll()
+    protected fun poll(connectionId: Int, command: Int): V? {
+        return queues[connectionId]?.get(command)?.poll()
     }
 
     @TestOnly
     protected fun read() {
         val message = readMessage()
-        val type = getType(message)
-        queues[type]?.add(message)
+
+        val connectionId = getConnectionId(message)
+        val connectionQueues = queues[connectionId] ?: return
+
+        val command = getCommand(message)
+        val commandQueue = connectionQueues.computeIfAbsent(command) { ConcurrentLinkedQueue() }
+
+        commandQueue.add(message)
     }
 }
 
