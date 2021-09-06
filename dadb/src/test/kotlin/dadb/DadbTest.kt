@@ -26,12 +26,38 @@ internal class DadbTest {
     @Test
     fun shellV2_read() {
         useDefaultChannel { channel ->
-            val connection = channel.connect("shell,v2,raw:echo hello")
-            val shellConnection = AdbShellConnection(connection)
-            val shellResponse = shellConnection.readAll()
-            Truth.assertThat(shellResponse.allOutput).isEqualTo("hello\n")
-            Truth.assertThat(shellResponse.exitCode).isEqualTo(0)
+            channel.shellV2("echo hello").use { shellConnection ->
+                val shellResponse = shellConnection.readAll()
+                assertShellResponse(shellResponse, 0, "hello\n")
+            }
         }
+    }
+
+    @Test
+    fun shellV2_write() {
+        useDefaultChannel { channel ->
+            channel.shellV2().use { shellConnection ->
+                shellConnection.write("echo hello\n")
+
+                val shellPacket = shellConnection.read()
+                assertShellPacket(shellPacket, Constants.SHELL_ID_STDOUT, "hello\n")
+
+                shellConnection.write("exit\n")
+
+                val shellResponse = shellConnection.readAll()
+                assertShellResponse(shellResponse, 0, "")
+            }
+        }
+    }
+
+    private fun assertShellResponse(shellResponse: AdbShellResponse, exitCode: Int, allOutput: String) {
+        Truth.assertThat(shellResponse.allOutput).isEqualTo(allOutput)
+        Truth.assertThat(shellResponse.exitCode).isEqualTo(exitCode)
+    }
+
+    private fun assertShellPacket(shellPacket: AdbShellPacket, id: Int, payload: String) {
+        Truth.assertThat(String(shellPacket.payload)).isEqualTo(payload)
+        Truth.assertThat(shellPacket.id).isEqualTo(id)
     }
 
     private fun useDefaultChannel(body: (channel: AdbChannel) -> Unit) {

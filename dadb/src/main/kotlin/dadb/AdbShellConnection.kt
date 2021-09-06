@@ -1,8 +1,13 @@
 package dadb
 
+fun AdbChannel.shellV2(command: String = ""): AdbShellConnection {
+    val connection = connect("shell,v2,raw:$command")
+    return AdbShellConnection(connection)
+}
+
 class AdbShellConnection(
         private val connection: AdbConnection
-) {
+) : AutoCloseable {
 
     fun readAll(): AdbShellResponse {
         val output = StringBuilder()
@@ -31,6 +36,23 @@ class AdbShellConnection(
         }
     }
 
+    fun write(string: String) {
+        write(Constants.SHELL_ID_STDIN, string.toByteArray())
+    }
+
+    fun write(id: Int, payload: ByteArray? = null) {
+        connection.sink.apply {
+            writeByte(id)
+            writeIntLe(payload?.size ?: 0)
+            if (payload != null) write(payload)
+            flush()
+        }
+    }
+
+    override fun close() {
+        connection.close()
+    }
+
     private fun checkId(id: Int): Int {
         check(id == Constants.SHELL_ID_STDOUT || id == Constants.SHELL_ID_STDERR || id == Constants.SHELL_ID_EXIT) {
             "Invalid shell packet id: $id"
@@ -48,12 +70,34 @@ class AdbShellConnection(
 class AdbShellPacket(
         val id: Int,
         val payload: ByteArray
-)
+) {
+
+    override fun toString() = "${idStr(id)}: ${payloadStr(id, payload)}"
+
+    companion object {
+
+        private fun idStr(id: Int) = when(id) {
+            Constants.SHELL_ID_STDOUT -> "STDOUT"
+            Constants.SHELL_ID_STDERR -> "STDERR"
+            Constants.SHELL_ID_EXIT -> "EXIT"
+            else -> throw IllegalArgumentException("Invalid shell packet id: $id")
+        }
+
+        private fun payloadStr(id: Int, payload: ByteArray) = if (id == Constants.SHELL_ID_EXIT) {
+            "${payload[0]}"
+        } else {
+            String(payload)
+        }
+    }
+}
 
 class AdbShellResponse(
         val output: String,
         val errorOutput: String,
         val exitCode: Int
 ) {
+
     val allOutput: String by lazy { "$output$errorOutput" }
+
+    override fun toString() = "Shell response ($exitCode):\n$allOutput"
 }

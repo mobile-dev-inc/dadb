@@ -74,24 +74,16 @@ class AdbConnection internal constructor(
         return try {
             messageQueue.take(localId, command)
         } catch (e: AdbConnectionClosed) {
-            close(false)
+            close()
             return null
         }
     }
 
     override fun close() {
-        close(true)
-    }
-
-    private fun close(readClose: Boolean) {
         if (isClosed) return
         isClosed = true
 
         adbWriter.writeClose(localId, remoteId)
-        adbWriter.close()
-        messageQueue.close()
-
-        if (readClose) messageQueue.take(localId, Constants.CMD_CLSE)
 
         messageQueue.stopListening(localId)
     }
