@@ -4,6 +4,9 @@ import com.google.common.truth.Truth
 import org.junit.Before
 import java.io.IOException
 import java.net.Socket
+import java.util.concurrent.CompletableFuture
+import kotlin.random.Random
+import kotlin.test.Ignore
 import kotlin.test.Test
 
 internal class DadbTest {
@@ -47,6 +50,27 @@ internal class DadbTest {
                 val shellResponse = shellConnection.readAll()
                 assertShellResponse(shellResponse, 0, "")
             }
+        }
+    }
+
+    @Test
+    fun shellV2_concurrency() {
+        useDefaultChannel { channel ->
+            val futures = (0 until 2).map { CompletableFuture.runAsync {
+                val random = Random.nextDouble()
+                channel.shellV2().use { shellConnection ->
+                    shellConnection.write("echo $random\n")
+
+                    val shellPacket = shellConnection.read()
+                    assertShellPacket(shellPacket, Constants.SHELL_ID_STDOUT, "$random\n")
+
+                    shellConnection.write("exit\n")
+
+                    val shellResponse = shellConnection.readAll()
+                    assertShellResponse(shellResponse, 0, "")
+                }
+            } }
+            CompletableFuture.allOf(*futures.toTypedArray()).get()
         }
     }
 

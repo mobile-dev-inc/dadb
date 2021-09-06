@@ -10,13 +10,11 @@ internal class AdbMessage(
         val payload: ByteArray
 ) {
 
-    override fun toString() = "${commandStr(command)}[${argStr(arg0)}, ${argStr(arg1)}]${payloadStr(payload)}"
+    override fun toString() = "${commandStr(command)}[${argStr(arg0)}, ${argStr(arg1)}] ${String(payload)}"
 
     companion object {
 
-        private fun payloadStr(payload: ByteArray) = if (payload.isEmpty()) "" else "(${payload.size})"
-
-        private fun argStr(arg: Int) = String.format("%05X", arg)
+        private fun argStr(arg: Int) = String.format("%X", arg)
 
         private fun commandStr(command: Int) = when (command) {
             Constants.CMD_AUTH -> "AUTH";

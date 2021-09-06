@@ -86,7 +86,7 @@ internal class MessageQueueTest {
             (0 until 50).map {
                 CompletableFuture.runAsync {
                     Truth.assertThat(take(messageQueue, type)).isEqualTo(type)
-                }.orTimeout(2000, TimeUnit.MILLISECONDS)
+                }
             }
         }
 
@@ -110,14 +110,14 @@ internal class MessageQueueTest {
         (0 until 50).map {
             CompletableFuture.runAsync {
                 take(messageQueue, 0)
-            }.orTimeout(500, TimeUnit.MILLISECONDS)
+            }
         }
 
         Thread.sleep(200)
 
         val future = CompletableFuture.runAsync {
             Truth.assertThat(take(messageQueue, 1)).isEqualTo(1)
-        }.orTimeout(1000, TimeUnit.MILLISECONDS)
+        }
 
         Thread.sleep(200)
 
@@ -129,16 +129,14 @@ internal class MessageQueueTest {
     }
 
     private fun waitFor(futures: List<CompletableFuture<Void>>) {
-        CompletableFuture.allOf(*futures.toTypedArray()).get()
+        CompletableFuture.allOf(*futures.toTypedArray()).get(5000, TimeUnit.MILLISECONDS)
     }
 
     private fun expectTimeout(futures: List<CompletableFuture<Void>>) {
         try {
-            CompletableFuture.allOf(*futures.toTypedArray()).get()
-            Truth.assertWithMessage("Expected ExecutionException").fail()
-        } catch (ignore: ExecutionException) {
-            Truth.assertThat(ignore.cause).isInstanceOf(TimeoutException::class.java)
-        }
+            CompletableFuture.allOf(*futures.toTypedArray()).get(500, TimeUnit.MILLISECONDS)
+            Truth.assertWithMessage("Expected TimeoutException").fail()
+        } catch (ignore: TimeoutException) {}
     }
 }
 

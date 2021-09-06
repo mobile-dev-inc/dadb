@@ -16,7 +16,9 @@ internal class AdbReader(source: Source) : AutoCloseable {
             val checksum = readIntLe()
             val magic = readIntLe()
             val payload = readByteArray(payloadLength.toLong())
-            return AdbMessage(command, arg0, arg1, payloadLength, checksum, magic, payload)
+            return AdbMessage(command, arg0, arg1, payloadLength, checksum, magic, payload).also {
+                println("< $it")
+            }
         }
     }
 
