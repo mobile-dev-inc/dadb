@@ -1,9 +1,8 @@
 package dadb
 
 import okio.*
-import kotlin.math.max
 
-class AdbConnection internal constructor(
+class AdbStream internal constructor(
         private val messageQueue: AdbMessageQueue,
         private val adbWriter: AdbWriter,
         private val maxPayloadSize: Int,
@@ -73,7 +72,7 @@ class AdbConnection internal constructor(
     private fun nextMessage(command: Int): AdbMessage? {
         return try {
             messageQueue.take(localId, command)
-        } catch (e: AdbConnectionClosed) {
+        } catch (e: AdbStreamClosed) {
             close()
             return null
         }

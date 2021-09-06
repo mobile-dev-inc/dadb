@@ -12,7 +12,7 @@ internal abstract class MessageQueue<V> {
     private val queueLock = ReentrantLock()
     private val queueCond = queueLock.newCondition()
     private val queues = ConcurrentHashMap<Int, ConcurrentHashMap<Int, Queue<V>>>()
-    private val openConnections = ConcurrentHashMap<Int, Boolean>().keySet(true)
+    private val openStreams = ConcurrentHashMap<Int, Boolean>().keySet(true)
 
     fun take(localId: Int, command: Int): V {
         while (true) {
@@ -38,19 +38,19 @@ internal abstract class MessageQueue<V> {
     }
 
     fun startListening(localId: Int) {
-        openConnections.add(localId)
+        openStreams.add(localId)
         queues.putIfAbsent(localId, ConcurrentHashMap())
     }
 
     fun stopListening(localId: Int) {
-        openConnections.remove(localId)
+        openStreams.remove(localId)
         queues.remove(localId)
     }
 
     @TestOnly
     fun ensureEmpty() {
         check(queues.isEmpty())
-        check(openConnections.isEmpty())
+        check(openStreams.isEmpty())
     }
 
     protected abstract fun readMessage(): V
@@ -62,10 +62,10 @@ internal abstract class MessageQueue<V> {
     protected abstract fun isCloseCommand(message: V): Boolean
 
     private fun poll(localId: Int, command: Int): V? {
-        val connectionQueues = queues[localId] ?: throw IllegalStateException("Not listening for localId: $localId")
-        val message = connectionQueues[command]?.poll()
-        if (message == null && !openConnections.contains(localId)) {
-            throw AdbConnectionClosed(localId)
+        val streamQueues = queues[localId] ?: throw IllegalStateException("Not listening for localId: $localId")
+        val message = streamQueues[command]?.poll()
+        if (message == null && !openStreams.contains(localId)) {
+            throw AdbStreamClosed(localId)
         }
         return message
     }
@@ -75,14 +75,14 @@ internal abstract class MessageQueue<V> {
         val localId = getLocalId(message)
 
         if (isCloseCommand(message)) {
-            openConnections.remove(localId)
+            openStreams.remove(localId)
             return
         }
 
-        val connectionQueues = queues[localId] ?: return
+        val streamQueues = queues[localId] ?: return
 
         val command = getCommand(message)
-        val commandQueue = connectionQueues.computeIfAbsent(command) { ConcurrentLinkedQueue() }
+        val commandQueue = streamQueues.computeIfAbsent(command) { ConcurrentLinkedQueue() }
 
         commandQueue.add(message)
     }

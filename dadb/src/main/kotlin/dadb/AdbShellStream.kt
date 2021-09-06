@@ -1,12 +1,12 @@
 package dadb
 
-fun AdbChannel.shellV2(command: String = ""): AdbShellConnection {
-    val connection = connect("shell,v2,raw:$command")
-    return AdbShellConnection(connection)
+fun AdbChannel.shellV2(command: String = ""): AdbShellStream {
+    val stream = open("shell,v2,raw:$command")
+    return AdbShellStream(stream)
 }
 
-class AdbShellConnection(
-        private val connection: AdbConnection
+class AdbShellStream(
+        private val stream: AdbStream
 ) : AutoCloseable {
 
     fun readAll(): AdbShellResponse {
@@ -28,7 +28,7 @@ class AdbShellConnection(
     }
 
     fun read(): AdbShellPacket {
-        connection.source.apply {
+        stream.source.apply {
             val id = checkId(readByte().toInt())
             val length = checkLength(id, readIntLe())
             val payload = readByteArray(length.toLong())
@@ -41,7 +41,7 @@ class AdbShellConnection(
     }
 
     fun write(id: Int, payload: ByteArray? = null) {
-        connection.sink.apply {
+        stream.sink.apply {
             writeByte(id)
             writeIntLe(payload?.size ?: 0)
             if (payload != null) write(payload)
@@ -50,7 +50,7 @@ class AdbShellConnection(
     }
 
     override fun close() {
-        connection.close()
+        stream.close()
     }
 
     private fun checkId(id: Int): Int {

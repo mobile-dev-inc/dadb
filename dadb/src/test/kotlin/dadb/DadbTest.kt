@@ -17,8 +17,8 @@ internal class DadbTest : BaseConcurrencyTest() {
     @Test
     fun basic() {
         useDefaultChannel { channel ->
-            channel.connect("shell,raw:echo hello").use { connection ->
-                val response = connection.source.readString(Charsets.UTF_8)
+            channel.open("shell,raw:echo hello").use { stream ->
+                val response = stream.source.readString(Charsets.UTF_8)
                 Truth.assertThat(response).isEqualTo("hello\n")
             }
         }
@@ -27,8 +27,8 @@ internal class DadbTest : BaseConcurrencyTest() {
     @Test
     fun shellV2_read() {
         useDefaultChannel { channel ->
-            channel.shellV2("echo hello").use { shellConnection ->
-                val shellResponse = shellConnection.readAll()
+            channel.shellV2("echo hello").use { shellStream ->
+                val shellResponse = shellStream.readAll()
                 assertShellResponse(shellResponse, 0, "hello\n")
             }
         }
@@ -37,15 +37,15 @@ internal class DadbTest : BaseConcurrencyTest() {
     @Test
     fun shellV2_write() {
         useDefaultChannel { channel ->
-            channel.shellV2().use { shellConnection ->
-                shellConnection.write("echo hello\n")
+            channel.shellV2().use { shellStream ->
+                shellStream.write("echo hello\n")
 
-                val shellPacket = shellConnection.read()
+                val shellPacket = shellStream.read()
                 assertShellPacket(shellPacket, Constants.SHELL_ID_STDOUT, "hello\n")
 
-                shellConnection.write("exit\n")
+                shellStream.write("exit\n")
 
-                val shellResponse = shellConnection.readAll()
+                val shellResponse = shellStream.readAll()
                 assertShellResponse(shellResponse, 0, "")
             }
         }
@@ -56,15 +56,15 @@ internal class DadbTest : BaseConcurrencyTest() {
         useDefaultChannel { channel ->
             launch(20) {
                 val random = Random.nextDouble()
-                channel.shellV2().use { shellConnection ->
-                    shellConnection.write("echo $random\n")
+                channel.shellV2().use { shellStream ->
+                    shellStream.write("echo $random\n")
 
-                    val shellPacket = shellConnection.read()
+                    val shellPacket = shellStream.read()
                     assertShellPacket(shellPacket, Constants.SHELL_ID_STDOUT, "$random\n")
 
-                    shellConnection.write("exit\n")
+                    shellStream.write("exit\n")
 
-                    val shellResponse = shellConnection.readAll()
+                    val shellResponse = shellStream.readAll()
                     assertShellResponse(shellResponse, 0, "")
                 }
             }
@@ -85,7 +85,7 @@ internal class DadbTest : BaseConcurrencyTest() {
     private fun useDefaultChannel(body: (channel: AdbChannel) -> Unit) {
         val socket = Socket("localhost", 5555)
         val keyPair = AdbKeyPair.readDefault()
-        val channel = AdbChannel.open(socket, keyPair)
+        val channel = AdbChannel.connect(socket, keyPair)
         channel.use(body)
         channel.ensureEmpty()
     }
