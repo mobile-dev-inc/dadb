@@ -54,7 +54,7 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
             offset: Int,
             length: Int
     ) {
-        println("> ${AdbMessage(command, arg0, arg1, payload?.size ?: 0, 0, 0, payload ?: ByteArray(0))}")
+        println("> ${AdbMessage(command, arg0, arg1, length, 0, 0, payload ?: ByteArray(0))}")
         bufferedSink.apply {
             writeIntLe(command)
             writeIntLe(arg0)

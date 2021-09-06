@@ -1,6 +1,5 @@
 package dadb
 
-import org.jetbrains.annotations.TestOnly
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -27,6 +26,15 @@ internal abstract class MessageQueue<V> {
         }
     }
 
+    fun takeUnsafe(localId: Int, command: Int): V {
+        while (true) {
+            synchronized(this) {
+                poll(localId, command)?.let { return it }
+                read()
+            }
+        }
+    }
+
     fun startListening(localId: Int) {
         queues.putIfAbsent(localId, ConcurrentHashMap())
     }
@@ -43,14 +51,12 @@ internal abstract class MessageQueue<V> {
 
     protected abstract fun isCloseCommand(message: V): Boolean
 
-    @TestOnly
-    protected fun poll(localId: Int, command: Int): V? {
+    private fun poll(localId: Int, command: Int): V? {
         val connectionQueues = queues[localId] ?: throw AdbConnectionClosed(localId)
         return connectionQueues[command]?.poll()
     }
 
-    @TestOnly
-    protected fun read() {
+    private fun read() {
         val message = readMessage()
         val localId = getLocalId(message)
 

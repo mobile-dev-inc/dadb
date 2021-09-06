@@ -9,7 +9,7 @@ import kotlin.random.Random
 import kotlin.test.Ignore
 import kotlin.test.Test
 
-internal class DadbTest {
+internal class DadbTest : BaseConcurrencyTest() {
 
     @Before
     fun setUp() {
@@ -56,7 +56,7 @@ internal class DadbTest {
     @Test
     fun shellV2_concurrency() {
         useDefaultChannel { channel ->
-            val futures = (0 until 2).map { CompletableFuture.runAsync {
+            launch(1) {
                 val random = Random.nextDouble()
                 channel.shellV2().use { shellConnection ->
                     shellConnection.write("echo $random\n")
@@ -69,8 +69,8 @@ internal class DadbTest {
                     val shellResponse = shellConnection.readAll()
                     assertShellResponse(shellResponse, 0, "")
                 }
-            } }
-            CompletableFuture.allOf(*futures.toTypedArray()).get()
+            }
+            waitForAll()
         }
     }
 
