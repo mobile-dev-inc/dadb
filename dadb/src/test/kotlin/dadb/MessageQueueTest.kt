@@ -173,7 +173,7 @@ private class TestMessageQueue : MessageQueue<Int>() {
         return readQueue.take()
     }
 
-    override fun getConnectionId(message: Int) = message
+    override fun getLocalId(message: Int) = message
 
     override fun getCommand(message: Int) = 0
 }

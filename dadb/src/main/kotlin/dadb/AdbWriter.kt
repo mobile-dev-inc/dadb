@@ -2,6 +2,7 @@ package dadb
 
 import okio.Sink
 import okio.buffer
+import java.nio.ByteBuffer
 
 internal class AdbWriter(sink: Sink) : AutoCloseable {
 
@@ -24,6 +25,13 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
             0,
             authPayload.size
     )
+
+    fun writeOpen(localId: Int, destination: String) {
+        val buffer = ByteBuffer.allocate(destination.length + 1)
+        buffer.put(destination.toByteArray())
+        buffer.put(0)
+        val payload = buffer.array()
+    }
 
     fun write(
             command: Int,

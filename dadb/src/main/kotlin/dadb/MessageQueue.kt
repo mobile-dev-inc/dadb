@@ -13,10 +13,10 @@ internal abstract class MessageQueue<V> {
     private val queueCond = queueLock.newCondition()
     private val queues = ConcurrentHashMap<Int, ConcurrentHashMap<Int, Queue<V>>>()
 
-    fun take(connectionId: Int, command: Int): V {
+    fun take(localId: Int, command: Int): V {
         while (true) {
             queueLock.lock {
-                poll(connectionId, command)?.let { return it }
+                poll(localId, command)?.let { return it }
                 readLock.tryLock ({
                     queueLock.unlock()
                     read()
@@ -27,31 +27,31 @@ internal abstract class MessageQueue<V> {
         }
     }
 
-    fun startListening(connectionId: Int) {
-        queues.putIfAbsent(connectionId, ConcurrentHashMap())
+    fun startListening(localId: Int) {
+        queues.putIfAbsent(localId, ConcurrentHashMap())
     }
 
-    fun stopListening(connectionId: Int) {
-        queues.remove(connectionId)
+    fun stopListening(localId: Int) {
+        queues.remove(localId)
     }
 
     protected abstract fun readMessage(): V
 
-    protected abstract fun getConnectionId(message: V): Int
+    protected abstract fun getLocalId(message: V): Int
 
     protected abstract fun getCommand(message: V): Int
 
     @TestOnly
-    protected fun poll(connectionId: Int, command: Int): V? {
-        return queues[connectionId]?.get(command)?.poll()
+    protected fun poll(localId: Int, command: Int): V? {
+        return queues[localId]?.get(command)?.poll()
     }
 
     @TestOnly
     protected fun read() {
         val message = readMessage()
 
-        val connectionId = getConnectionId(message)
-        val connectionQueues = queues[connectionId] ?: return
+        val localId = getLocalId(message)
+        val connectionQueues = queues[localId] ?: return
 
         val command = getCommand(message)
         val commandQueue = connectionQueues.computeIfAbsent(command) { ConcurrentLinkedQueue() }

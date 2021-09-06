@@ -7,6 +7,7 @@ import okio.source
 import java.io.Closeable
 import java.io.IOException
 import java.net.Socket
+import kotlin.random.Random
 
 class AdbChannel private constructor(
         private val adbReader: AdbReader,
@@ -19,6 +20,15 @@ class AdbChannel private constructor(
 
     private val messageQueue = AdbMessageQueue(adbReader)
 
+    fun connect() {
+        val localId = newId()
+        messageQueue.startListening(localId)
+    }
+
+    private fun newId(): Int {
+        return Random.nextInt()
+    }
+
     override fun close() {
         try {
             adbReader.close()
@@ -29,18 +39,18 @@ class AdbChannel private constructor(
 
     companion object {
 
-        fun connect(socket: Socket, keyPair: AdbKeyPair? = null): AdbChannel {
+        fun open(socket: Socket, keyPair: AdbKeyPair? = null): AdbChannel {
             val source = socket.source()
             val sink = socket.sink()
-            return connect(source, sink, keyPair, socket)
+            return open(source, sink, keyPair, socket)
         }
 
-        private fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null, closeable: Closeable? = null): AdbChannel {
+        private fun open(source: Source, sink: Sink, keyPair: AdbKeyPair? = null, closeable: Closeable? = null): AdbChannel {
             val adbReader = AdbReader(source)
             val adbWriter = AdbWriter(sink)
 
             try {
-                return connect(adbReader, adbWriter, keyPair, closeable)
+                return open(adbReader, adbWriter, keyPair, closeable)
             } catch (t: Throwable) {
                 adbReader.close()
                 adbWriter.close()
@@ -48,7 +58,7 @@ class AdbChannel private constructor(
             }
         }
 
-        private fun connect(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair?, closeable: Closeable?): AdbChannel {
+        private fun open(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair?, closeable: Closeable?): AdbChannel {
             adbWriter.writeConnect()
 
             var message = adbReader.readMessage()

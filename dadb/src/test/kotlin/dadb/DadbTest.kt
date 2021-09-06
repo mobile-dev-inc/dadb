@@ -16,7 +16,9 @@ internal class DadbTest {
     fun name() {
         val socket = Socket("localhost", 5555)
         val keyPair = AdbKeyPair.readDefault()
-        AdbChannel.connect(socket, keyPair).close()
+        val channel = AdbChannel.open(socket, keyPair)
+        channel.connect()
+        channel.close()
     }
 
     private fun killServer() {
