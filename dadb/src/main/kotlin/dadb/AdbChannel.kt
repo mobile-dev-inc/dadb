@@ -26,7 +26,7 @@ class AdbChannel private constructor(
         adbWriter.writeOpen(localId, destination)
         val message = messageQueue.take(localId, Constants.CMD_OKAY)
         val remoteId = message.arg0
-        return AdbConnection(messageQueue, adbWriter, localId, remoteId)
+        return AdbConnection(messageQueue, adbWriter, maxPayloadSize, localId, remoteId)
     }
 
     private fun newId(): Int {
@@ -68,8 +68,8 @@ class AdbChannel private constructor(
             var message = adbReader.readMessage()
 
             if (message.command == Constants.CMD_AUTH) {
-                if (keyPair == null) throw IllegalStateException("Authentication required but no KeyPair provided")
-                if (message.arg0 != Constants.AUTH_TYPE_TOKEN) throw IllegalStateException("Unsupported auth type: $message")
+                checkNotNull(keyPair) { "Authentication required but no KeyPair provided" }
+                check(message.arg0 == Constants.AUTH_TYPE_TOKEN) { "Unsupported auth type: $message" }
 
                 val signature = keyPair.signPayload(message)
                 adbWriter.writeAuth(Constants.AUTH_TYPE_SIGNATURE, signature)

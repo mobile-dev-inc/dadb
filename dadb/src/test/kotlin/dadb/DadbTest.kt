@@ -1,5 +1,6 @@
 package dadb
 
+import okio.buffer
 import org.junit.Before
 import java.io.IOException
 import java.net.Socket
@@ -18,7 +19,8 @@ internal class DadbTest {
         val keyPair = AdbKeyPair.readDefault()
         AdbChannel.open(socket, keyPair).use { channel ->
             channel.connect("shell,raw:echo hello").use { connection ->
-
+                val response = connection.source.buffer().readString(Charsets.UTF_8)
+                println(response)
             }
         }
     }

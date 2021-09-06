@@ -8,7 +8,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.squareup.okio:okio:2.10.0")
+    api("com.squareup.okio:okio:2.10.0")
     implementation(platform("org.jetbrains.kotlin:kotlin-bom"))
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("org.bouncycastle:bcpkix-jdk15on:1.68")

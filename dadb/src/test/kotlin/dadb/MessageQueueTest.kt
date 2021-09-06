@@ -176,4 +176,6 @@ private class TestMessageQueue : MessageQueue<Int>() {
     override fun getLocalId(message: Int) = message
 
     override fun getCommand(message: Int) = 0
+
+    override fun isCloseCommand(message: Int) = false
 }

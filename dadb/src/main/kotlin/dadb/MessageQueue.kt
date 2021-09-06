@@ -41,16 +41,24 @@ internal abstract class MessageQueue<V> {
 
     protected abstract fun getCommand(message: V): Int
 
+    protected abstract fun isCloseCommand(message: V): Boolean
+
     @TestOnly
     protected fun poll(localId: Int, command: Int): V? {
-        return queues[localId]?.get(command)?.poll()
+        val connectionQueues = queues[localId] ?: throw AdbConnectionClosed(localId)
+        return connectionQueues[command]?.poll()
     }
 
     @TestOnly
     protected fun read() {
         val message = readMessage()
-
         val localId = getLocalId(message)
+
+        if (isCloseCommand(message)) {
+            stopListening(localId)
+            return
+        }
+
         val connectionQueues = queues[localId] ?: return
 
         val command = getCommand(message)

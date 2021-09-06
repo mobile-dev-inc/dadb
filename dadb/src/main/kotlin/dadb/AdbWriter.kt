@@ -34,8 +34,16 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
         write(Constants.CMD_OPEN, localId, 0, payload, 0, payload.size)
     }
 
+    fun writeWrite(localId: Int, remoteId: Int, payload: ByteArray, offset: Int, length: Int) {
+        write(Constants.CMD_WRTE, localId, remoteId, payload, offset, length)
+    }
+
     fun writeClose(localId: Int, remoteId: Int) {
         write(Constants.CMD_CLSE, localId, remoteId, null, 0, 0)
+    }
+
+    fun writeOkay(localId: Int, remoteId: Int) {
+        write(Constants.CMD_OKAY, localId, remoteId, null, 0, 0)
     }
 
     fun write(
