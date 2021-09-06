@@ -56,7 +56,7 @@ internal class DadbTest : BaseConcurrencyTest() {
     @Test
     fun shellV2_concurrency() {
         useDefaultChannel { channel ->
-            launch(1) {
+            launch(20) {
                 val random = Random.nextDouble()
                 channel.shellV2().use { shellConnection ->
                     shellConnection.write("echo $random\n")

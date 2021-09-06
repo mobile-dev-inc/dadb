@@ -54,23 +54,25 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
             offset: Int,
             length: Int
     ) {
-        println("> ${AdbMessage(command, arg0, arg1, length, 0, 0, payload ?: ByteArray(0))}")
-        bufferedSink.apply {
-            writeIntLe(command)
-            writeIntLe(arg0)
-            writeIntLe(arg1)
-            if (payload == null) {
-                writeIntLe(0)
-                writeIntLe(0)
-            } else {
-                writeIntLe(length)
-                writeIntLe(payloadChecksum(payload))
+        println("(${Thread.currentThread().name}) > ${AdbMessage(command, arg0, arg1, length, 0, 0, payload ?: ByteArray(0))}")
+        synchronized(bufferedSink) {
+            bufferedSink.apply {
+                writeIntLe(command)
+                writeIntLe(arg0)
+                writeIntLe(arg1)
+                if (payload == null) {
+                    writeIntLe(0)
+                    writeIntLe(0)
+                } else {
+                    writeIntLe(length)
+                    writeIntLe(payloadChecksum(payload))
+                }
+                writeIntLe(command xor -0x1)
+                if (payload != null) {
+                    write(payload, offset, length)
+                }
+                flush()
             }
-            writeIntLe(command xor -0x1)
-            if (payload != null) {
-                write(payload, offset, length)
-            }
-            flush()
         }
     }
 
