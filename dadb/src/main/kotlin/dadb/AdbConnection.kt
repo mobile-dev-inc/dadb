@@ -7,8 +7,8 @@ class AdbConnection internal constructor(
         private val messageQueue: AdbMessageQueue,
         private val adbWriter: AdbWriter,
         private val maxPayloadSize: Int,
-        private val localId: Int,
-        private val remoteId: Int
+        val localId: Int,
+        val remoteId: Int
 ) : AutoCloseable {
 
     private var isClosed = false

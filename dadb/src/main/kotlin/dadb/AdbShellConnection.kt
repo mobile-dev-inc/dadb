@@ -1,5 +1,7 @@
 package dadb
 
+import java.io.EOFException
+
 fun AdbChannel.shellV2(command: String = ""): AdbShellConnection {
     val connection = connect("shell,v2,raw:$command")
     return AdbShellConnection(connection)
@@ -13,7 +15,12 @@ class AdbShellConnection(
         val output = StringBuilder()
         val errorOutput = StringBuilder()
         while (true) {
-            val packet = read()
+            val packet = try {
+                read()
+            } catch (e: EOFException) {
+                println("(${Thread.currentThread().name}) ========== < [${String.format("%X", connection.localId)}] | EOFException")
+                throw e
+            }
             val id = packet.id
             if (id == Constants.SHELL_ID_EXIT) {
                 val exitCode = packet.payload[0].toInt()
@@ -32,7 +39,9 @@ class AdbShellConnection(
             val id = checkId(readByte().toInt())
             val length = checkLength(id, readIntLe())
             val payload = readByteArray(length.toLong())
-            return AdbShellPacket(id, payload)
+            return AdbShellPacket(id, payload).apply {
+                println("(${Thread.currentThread().name}) ========== < [${String.format("%X", connection.localId)}] | $this")
+            }
         }
     }
 
