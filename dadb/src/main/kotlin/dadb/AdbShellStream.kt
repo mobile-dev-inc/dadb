@@ -1,6 +1,6 @@
 package dadb
 
-fun AdbChannel.shellV2(command: String = ""): AdbShellStream {
+fun AdbConnection.shellV2(command: String = ""): AdbShellStream {
     val stream = open("shell,v2,raw:$command")
     return AdbShellStream(stream)
 }

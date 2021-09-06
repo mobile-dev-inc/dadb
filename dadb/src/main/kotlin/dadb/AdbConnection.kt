@@ -10,7 +10,7 @@ import java.io.IOException
 import java.net.Socket
 import kotlin.random.Random
 
-class AdbChannel private constructor(
+class AdbConnection private constructor(
         adbReader: AdbReader,
         private val adbWriter: AdbWriter,
         private val closeable: Closeable?,
@@ -49,13 +49,13 @@ class AdbChannel private constructor(
 
     companion object {
 
-        fun connect(socket: Socket, keyPair: AdbKeyPair? = null): AdbChannel {
+        fun connect(socket: Socket, keyPair: AdbKeyPair? = null): AdbConnection {
             val source = socket.source()
             val sink = socket.sink()
             return connect(source, sink, keyPair, socket)
         }
 
-        private fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null, closeable: Closeable? = null): AdbChannel {
+        private fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null, closeable: Closeable? = null): AdbConnection {
             val adbReader = AdbReader(source)
             val adbWriter = AdbWriter(sink)
 
@@ -68,7 +68,7 @@ class AdbChannel private constructor(
             }
         }
 
-        private fun connect(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair?, closeable: Closeable?): AdbChannel {
+        private fun connect(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair?, closeable: Closeable?): AdbConnection {
             adbWriter.writeConnect()
 
             var message = adbReader.readMessage()
@@ -93,7 +93,7 @@ class AdbChannel private constructor(
             val version = message.arg0
             val maxPayloadSize = message.arg1
 
-            return AdbChannel(adbReader, adbWriter, closeable, connectionString, version, maxPayloadSize)
+            return AdbConnection(adbReader, adbWriter, closeable, connectionString, version, maxPayloadSize)
         }
     }
 }

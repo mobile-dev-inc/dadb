@@ -16,8 +16,8 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun basic() {
-        useDefaultChannel { channel ->
-            channel.open("shell,raw:echo hello").use { stream ->
+        useDefaultConnection { connection ->
+            connection.open("shell,raw:echo hello").use { stream ->
                 val response = stream.source.readString(Charsets.UTF_8)
                 Truth.assertThat(response).isEqualTo("hello\n")
             }
@@ -26,8 +26,8 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun shellV2_read() {
-        useDefaultChannel { channel ->
-            channel.shellV2("echo hello").use { shellStream ->
+        useDefaultConnection { connection ->
+            connection.shellV2("echo hello").use { shellStream ->
                 val shellResponse = shellStream.readAll()
                 assertShellResponse(shellResponse, 0, "hello\n")
             }
@@ -36,8 +36,8 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun shellV2_write() {
-        useDefaultChannel { channel ->
-            channel.shellV2().use { shellStream ->
+        useDefaultConnection { connection ->
+            connection.shellV2().use { shellStream ->
                 shellStream.write("echo hello\n")
 
                 val shellPacket = shellStream.read()
@@ -53,10 +53,10 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun shellV2_concurrency() {
-        useDefaultChannel { channel ->
+        useDefaultConnection { connection ->
             launch(20) {
                 val random = Random.nextDouble()
-                channel.shellV2().use { shellStream ->
+                connection.shellV2().use { shellStream ->
                     shellStream.write("echo $random\n")
 
                     val shellPacket = shellStream.read()
@@ -82,12 +82,12 @@ internal class DadbTest : BaseConcurrencyTest() {
         Truth.assertThat(shellPacket.id).isEqualTo(id)
     }
 
-    private fun useDefaultChannel(body: (channel: AdbChannel) -> Unit) {
+    private fun useDefaultConnection(body: (connection: AdbConnection) -> Unit) {
         val socket = Socket("localhost", 5555)
         val keyPair = AdbKeyPair.readDefault()
-        val channel = AdbChannel.connect(socket, keyPair)
-        channel.use(body)
-        channel.ensureEmpty()
+        val connection = AdbConnection.connect(socket, keyPair)
+        connection.use(body)
+        connection.ensureEmpty()
     }
 
     private fun killServer() {
