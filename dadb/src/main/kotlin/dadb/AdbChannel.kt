@@ -4,6 +4,7 @@ import okio.Sink
 import okio.Source
 import okio.sink
 import okio.source
+import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
 import java.io.IOException
 import java.net.Socket
@@ -39,6 +40,11 @@ class AdbChannel private constructor(
             adbWriter.close()
             closeable?.close()
         } catch (ignore: Throwable) {}
+    }
+
+    @TestOnly
+    internal fun ensureEmpty() {
+        messageQueue.ensureEmpty()
     }
 
     companion object {

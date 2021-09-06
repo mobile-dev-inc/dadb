@@ -4,9 +4,7 @@ import com.google.common.truth.Truth
 import org.junit.Before
 import java.io.IOException
 import java.net.Socket
-import java.util.concurrent.CompletableFuture
 import kotlin.random.Random
-import kotlin.test.Ignore
 import kotlin.test.Test
 
 internal class DadbTest : BaseConcurrencyTest() {
@@ -87,7 +85,9 @@ internal class DadbTest : BaseConcurrencyTest() {
     private fun useDefaultChannel(body: (channel: AdbChannel) -> Unit) {
         val socket = Socket("localhost", 5555)
         val keyPair = AdbKeyPair.readDefault()
-        AdbChannel.open(socket, keyPair).use(body)
+        val channel = AdbChannel.open(socket, keyPair)
+        channel.use(body)
+        channel.ensureEmpty()
     }
 
     private fun killServer() {
