@@ -31,6 +31,11 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
         buffer.put(destination.toByteArray())
         buffer.put(0)
         val payload = buffer.array()
+        write(Constants.CMD_OPEN, localId, 0, payload, 0, payload.size)
+    }
+
+    fun writeClose(localId: Int, remoteId: Int) {
+        write(Constants.CMD_CLSE, localId, remoteId, null, 0, 0)
     }
 
     fun write(

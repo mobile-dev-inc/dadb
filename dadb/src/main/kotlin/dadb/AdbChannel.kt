@@ -10,7 +10,7 @@ import java.net.Socket
 import kotlin.random.Random
 
 class AdbChannel private constructor(
-        private val adbReader: AdbReader,
+        adbReader: AdbReader,
         private val adbWriter: AdbWriter,
         private val closeable: Closeable?,
         private val connectionString: String,
@@ -20,9 +20,13 @@ class AdbChannel private constructor(
 
     private val messageQueue = AdbMessageQueue(adbReader)
 
-    fun connect() {
+    fun connect(destination: String): AdbConnection {
         val localId = newId()
         messageQueue.startListening(localId)
+        adbWriter.writeOpen(localId, destination)
+        val message = messageQueue.take(localId, Constants.CMD_OKAY)
+        val remoteId = message.arg0
+        return AdbConnection(messageQueue, adbWriter, localId, remoteId)
     }
 
     private fun newId(): Int {
@@ -31,7 +35,7 @@ class AdbChannel private constructor(
 
     override fun close() {
         try {
-            adbReader.close()
+            messageQueue.close()
             adbWriter.close()
             closeable?.close()
         } catch (ignore: Throwable) {}
