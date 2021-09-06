@@ -1,9 +1,6 @@
 package dadb
 
-import okio.Buffer
-import okio.Sink
-import okio.Source
-import okio.Timeout
+import okio.*
 import kotlin.math.max
 
 class AdbConnection internal constructor(
@@ -49,7 +46,7 @@ class AdbConnection internal constructor(
         override fun close() {}
 
         override fun timeout() = Timeout.NONE
-    }
+    }.buffer()
 
     val sink = object : Sink {
 
@@ -71,7 +68,7 @@ class AdbConnection internal constructor(
         override fun close() {}
 
         override fun timeout() = Timeout.NONE
-    }
+    }.buffer()
 
     private fun nextMessage(command: Int): AdbMessage? {
         return try {
@@ -90,12 +87,12 @@ class AdbConnection internal constructor(
         if (isClosed) return
         isClosed = true
 
-        messageQueue.stopListening(localId)
-
         adbWriter.writeClose(localId, remoteId)
         adbWriter.close()
         messageQueue.close()
 
         if (readClose) messageQueue.take(localId, Constants.CMD_CLSE)
+
+        messageQueue.stopListening(localId)
     }
 }
