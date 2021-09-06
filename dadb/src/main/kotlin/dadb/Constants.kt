@@ -13,7 +13,6 @@ internal object Constants {
     const val CMD_CLSE = 0x45534c43
     const val CMD_WRTE = 0x45545257
 
-    const val ADB_HEADER_LENGTH = 24
     const val CONNECT_VERSION = 0x01000000
     const val CONNECT_MAXDATA = 1024 * 1024
 

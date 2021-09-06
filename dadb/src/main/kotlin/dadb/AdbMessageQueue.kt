@@ -8,9 +8,7 @@ internal class AdbMessageQueue(private val adbReader: AdbReader) : AutoCloseable
 
     override fun getCommand(message: AdbMessage) = message.command
 
-    override fun close() {
-        adbReader.close()
-    }
+    override fun close() = adbReader.close()
 
     override fun isCloseCommand(message: AdbMessage) = message.command == Constants.CMD_CLSE
 }
