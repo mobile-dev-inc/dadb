@@ -48,7 +48,22 @@ interface Dadb : AutoCloseable {
 
     companion object {
 
+        private const val MIN_EMULATOR_PORT = 5555
+        private const val MAX_EMULATOR_PORT = 5683
+
         @JvmStatic
         fun create(host: String, port: Int, keyPair: AdbKeyPair? = null): Dadb = DadbImpl(host, port, keyPair)
+
+        @JvmStatic
+        fun discover(host: String, keyPair: AdbKeyPair? = null): Dadb? {
+            (MIN_EMULATOR_PORT .. MAX_EMULATOR_PORT).forEach { port ->
+                val dadb = create(host, port)
+                try {
+                    val response = dadb.shell("echo success")
+                    if (response.allOutput == "success\n") return dadb
+                } catch (ignore : Throwable) {}
+            }
+            return null
+        }
     }
 }

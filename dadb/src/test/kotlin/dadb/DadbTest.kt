@@ -17,6 +17,7 @@
 
 package dadb
 
+import com.google.common.truth.Truth
 import org.junit.After
 import kotlin.test.Test
 
@@ -42,5 +43,16 @@ internal class DadbTest {
     fun root() {
         dadb.root()
         dadb.unroot()
+    }
+
+    @Test
+    fun discover() {
+        val dadb = Dadb.discover("localhost") ?: fail("Failed to discover emulator")
+        assertShellResponse(dadb.shell("echo hello"), 0, "hello\n")
+    }
+
+    private fun fail(message: String): Nothing {
+        Truth.assertWithMessage(message).fail()
+        throw RuntimeException()
     }
 }
