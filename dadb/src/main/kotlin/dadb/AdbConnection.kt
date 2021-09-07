@@ -17,12 +17,10 @@
 
 package dadb
 
-import okio.Sink
-import okio.Source
-import okio.sink
-import okio.source
+import okio.*
 import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
+import java.io.File
 import java.io.IOException
 import java.net.Socket
 import kotlin.random.Random
@@ -38,11 +36,38 @@ class AdbConnection private constructor(
 
     private val messageQueue = AdbMessageQueue(adbReader)
 
-    fun shell(command: String = ""): AdbShellStream {
+    @Throws(IOException::class)
+    fun install(file: File) {
+        abbExec("package", "install", "-S", file.length().toString()).use { stream ->
+            stream.sink.writeAll(file.source())
+            stream.sink.flush()
+            val response = stream.source.readString(Charsets.UTF_8)
+            if (!response.startsWith("Success")) {
+                throw IOException("Install failed: $response")
+            }
+        }
+    }
+
+    @Throws(IOException::class)
+    fun shell(command: String = ""): AdbShellResponse {
+        openShell(command).use { stream ->
+            return stream.readAll()
+        }
+    }
+
+    @Throws(IOException::class)
+    fun openShell(command: String = ""): AdbShellStream {
         val stream = open("shell,v2,raw:$command")
         return AdbShellStream(stream)
     }
 
+    @Throws(IOException::class)
+    fun abbExec(vararg command: String): AdbStream {
+        val destination = "abb_exec:${command.joinToString("\u0000")}"
+        return open(destination)
+    }
+
+    @Throws(IOException::class)
     fun open(destination: String): AdbStream {
         val localId = newId()
         messageQueue.startListening(localId)
@@ -71,6 +96,7 @@ class AdbConnection private constructor(
 
     companion object {
 
+        @Throws(IOException::class)
         fun connect(socket: Socket, keyPair: AdbKeyPair? = null): AdbConnection {
             val source = socket.source()
             val sink = socket.sink()

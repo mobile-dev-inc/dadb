@@ -42,9 +42,9 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
-    fun shell_read() {
+    fun openShell_read() {
         useDefaultConnection { connection ->
-            connection.shell("echo hello").use { shellStream ->
+            connection.openShell("echo hello").use { shellStream ->
                 val shellResponse = shellStream.readAll()
                 assertShellResponse(shellResponse, 0, "hello\n")
             }
@@ -52,9 +52,9 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
-    fun shell_write() {
+    fun openShell_write() {
         useDefaultConnection { connection ->
-            connection.shell().use { shellStream ->
+            connection.openShell().use { shellStream ->
                 shellStream.write("echo hello\n")
 
                 val shellPacket = shellStream.read()
@@ -69,11 +69,11 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
-    fun shell_concurrency() {
+    fun openShell_concurrency() {
         useDefaultConnection { connection ->
             launch(20) {
                 val random = Random.nextDouble()
-                connection.shell().use { shellStream ->
+                connection.openShell().use { shellStream ->
                     shellStream.write("echo $random\n")
 
                     val shellPacket = shellStream.read()
@@ -86,6 +86,15 @@ internal class DadbTest : BaseConcurrencyTest() {
                 }
             }
             waitForAll()
+        }
+    }
+
+    @Test
+    fun install() {
+        useDefaultConnection { connection ->
+            connection.install(TestApk.FILE)
+            val response = connection.shell("pm list packages ${TestApk.PACKAGE_NAME}")
+            assertShellResponse(response, 0, "package:${TestApk.PACKAGE_NAME}\n")
         }
     }
 

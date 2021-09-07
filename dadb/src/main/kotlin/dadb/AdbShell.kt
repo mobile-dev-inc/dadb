@@ -17,6 +17,8 @@
 
 package dadb
 
+import java.io.IOException
+
 const val ID_STDIN = 0
 const val ID_STDOUT = 1
 const val ID_STDERR = 2
@@ -27,6 +29,7 @@ class AdbShellStream(
         private val stream: AdbStream
 ) : AutoCloseable {
 
+    @Throws(IOException::class)
     fun readAll(): AdbShellResponse {
         val output = StringBuilder()
         val errorOutput = StringBuilder()
@@ -45,6 +48,7 @@ class AdbShellStream(
         }
     }
 
+    @Throws(IOException::class)
     fun read(): AdbShellPacket {
         stream.source.apply {
             val id = checkId(readByte().toInt())
@@ -54,10 +58,12 @@ class AdbShellStream(
         }
     }
 
+    @Throws(IOException::class)
     fun write(string: String) {
         write(ID_STDIN, string.toByteArray())
     }
 
+    @Throws(IOException::class)
     fun write(id: Int, payload: ByteArray? = null) {
         stream.sink.apply {
             writeByte(id)
