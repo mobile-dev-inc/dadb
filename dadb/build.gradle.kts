@@ -1,5 +1,7 @@
 plugins {
+    `maven-publish`
     id("org.jetbrains.kotlin.jvm")
+    id("com.vanniktech.maven.publish")
     `java-library`
 }
 
