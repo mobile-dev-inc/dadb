@@ -43,6 +43,7 @@ internal class DadbTest {
     @Ignore
     @Test
     fun root() {
+        TODO("@Ignore not working")
         dadb.root()
         dadb.unroot()
     }

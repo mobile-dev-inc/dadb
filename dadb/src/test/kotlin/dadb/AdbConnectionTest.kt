@@ -111,6 +111,7 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
     @Ignore
     @Test
     fun root() {
+        TODO("@Ignore not working")
         localEmulator(Dadb::unroot)
         localEmulator(Dadb::root)
         localEmulator { dadb ->
@@ -122,6 +123,7 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
     @Ignore
     @Test
     fun unroot() {
+        TODO("@Ignore not working")
         localEmulator(Dadb::root)
         localEmulator(Dadb::unroot)
         localEmulator { dadb ->
