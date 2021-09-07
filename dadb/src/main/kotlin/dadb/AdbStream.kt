@@ -60,6 +60,7 @@ class AdbStream internal constructor(
             message?.let { return it }
             val nextMessage = nextMessage(Constants.CMD_WRTE)
             message = nextMessage
+            bytesRead = 0
             return nextMessage
         }
 
