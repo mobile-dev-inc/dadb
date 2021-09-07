@@ -32,8 +32,8 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
 
     @Test
     fun basic() {
-        localEmulator { connection ->
-            connection.open("shell,raw:echo hello").use { stream ->
+        localEmulator { dadb ->
+            dadb.open("shell,raw:echo hello").use { stream ->
                 val response = stream.source.readString(Charsets.UTF_8)
                 Truth.assertThat(response).isEqualTo("hello\n")
             }
@@ -42,8 +42,8 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
 
     @Test
     fun openShell_read() {
-        localEmulator { connection ->
-            connection.openShell("echo hello").use { shellStream ->
+        localEmulator { dadb ->
+            dadb.openShell("echo hello").use { shellStream ->
                 val shellResponse = shellStream.readAll()
                 assertShellResponse(shellResponse, 0, "hello\n")
             }
@@ -52,8 +52,8 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
 
     @Test
     fun openShell_write() {
-        localEmulator { connection ->
-            connection.openShell().use { shellStream ->
+        localEmulator { dadb ->
+            dadb.openShell().use { shellStream ->
                 shellStream.write("echo hello\n")
 
                 val shellPacket = shellStream.read()
@@ -69,10 +69,10 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
 
     @Test
     fun openShell_concurrency() {
-        localEmulator { connection ->
+        localEmulator { dadb ->
             launch(20) {
                 val random = Random.nextDouble()
-                connection.openShell().use { shellStream ->
+                dadb.openShell().use { shellStream ->
                     shellStream.write("echo $random\n")
 
                     val shellPacket = shellStream.read()
@@ -90,44 +90,44 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
 
     @Test
     fun install() {
-        localEmulator { connection ->
-            connection.install(TestApk.FILE)
-            val response = connection.shell("pm list packages ${TestApk.PACKAGE_NAME}")
+        localEmulator { dadb ->
+            dadb.install(TestApk.FILE)
+            val response = dadb.shell("pm list packages ${TestApk.PACKAGE_NAME}")
             assertShellResponse(response, 0, "package:${TestApk.PACKAGE_NAME}\n")
         }
     }
 
     @Test
     fun uninstall() {
-        localEmulator { connection ->
-            connection.install(TestApk.FILE)
-            connection.uninstall(TestApk.PACKAGE_NAME)
-            val response = connection.shell("pm list packages ${TestApk.PACKAGE_NAME}")
+        localEmulator { dadb ->
+            dadb.install(TestApk.FILE)
+            dadb.uninstall(TestApk.PACKAGE_NAME)
+            val response = dadb.shell("pm list packages ${TestApk.PACKAGE_NAME}")
             assertShellResponse(response, 0, "")
         }
     }
 
     @Test
     fun root() {
-        localEmulator { connection ->
-            connection.unroot()
+        localEmulator { dadb ->
+            dadb.unroot()
         }
-        localEmulator { connection ->
-            connection.root()
+        localEmulator { dadb ->
+            dadb.root()
         }
     }
 
     @Test
     fun unroot() {
-        localEmulator { connection ->
-            connection.root()
+        localEmulator { dadb ->
+            dadb.root()
         }
-        localEmulator { connection ->
-            connection.unroot()
+        localEmulator { dadb ->
+            dadb.unroot()
         }
     }
 
-    private fun localEmulator(body: (connection: AdbConnection) -> Unit) {
+    private fun localEmulator(body: (dadb: Dadb) -> Unit) {
         val socket = Socket("localhost", 5555)
         val keyPair = AdbKeyPair.readDefault()
         val connection = AdbConnection.connect(socket, keyPair)
