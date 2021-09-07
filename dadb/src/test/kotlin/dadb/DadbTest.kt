@@ -98,6 +98,16 @@ internal class DadbTest : BaseConcurrencyTest() {
         }
     }
 
+    @Test
+    fun uninstall() {
+        useDefaultConnection { connection ->
+            connection.install(TestApk.FILE)
+            connection.uninstall(TestApk.PACKAGE_NAME)
+            val response = connection.shell("pm list packages ${TestApk.PACKAGE_NAME}")
+            assertShellResponse(response, 0, "")
+        }
+    }
+
     private fun assertShellResponse(shellResponse: AdbShellResponse, exitCode: Int, allOutput: String) {
         Truth.assertThat(shellResponse.allOutput).isEqualTo(allOutput)
         Truth.assertThat(shellResponse.exitCode).isEqualTo(exitCode)

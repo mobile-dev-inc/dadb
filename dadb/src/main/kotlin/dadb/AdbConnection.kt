@@ -49,6 +49,14 @@ class AdbConnection private constructor(
     }
 
     @Throws(IOException::class)
+    fun uninstall(packageName: String) {
+        val response = shell("cmd package uninstall $packageName")
+        if (response.exitCode != 0) {
+            throw IOException("Uninstall failed: ${response.allOutput}")
+        }
+    }
+
+    @Throws(IOException::class)
     fun shell(command: String = ""): AdbShellResponse {
         openShell(command).use { stream ->
             return stream.readAll()
