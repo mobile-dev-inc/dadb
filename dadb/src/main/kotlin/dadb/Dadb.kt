@@ -57,7 +57,7 @@ interface Dadb : AutoCloseable {
         @JvmStatic
         fun discover(host: String, keyPair: AdbKeyPair? = null): Dadb? {
             (MIN_EMULATOR_PORT .. MAX_EMULATOR_PORT).forEach { port ->
-                val dadb = create(host, port)
+                val dadb = create(host, port, keyPair)
                 try {
                     val response = dadb.shell("echo success")
                     if (response.allOutput == "success\n") return dadb
