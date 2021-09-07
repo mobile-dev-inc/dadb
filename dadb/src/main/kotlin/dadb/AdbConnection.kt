@@ -92,6 +92,16 @@ class AdbConnection internal constructor(
         }
     }
 
+    @Throws(IOException::class)
+    fun open(destination: String): AdbStream {
+        val localId = newId()
+        messageQueue.startListening(localId)
+        adbWriter.writeOpen(localId, destination)
+        val message = messageQueue.take(localId, Constants.CMD_OKAY)
+        val remoteId = message.arg0
+        return AdbStream(messageQueue, adbWriter, maxPayloadSize, localId, remoteId)
+    }
+
     private fun restartAdb(destination: String): String {
         open(destination).use { stream ->
             return stream.source.readUntil('\n'.toByte()).readString(Charsets.UTF_8)
@@ -107,18 +117,13 @@ class AdbConnection internal constructor(
         }
     }
 
-    @Throws(IOException::class)
-    fun open(destination: String): AdbStream {
-        val localId = newId()
-        messageQueue.startListening(localId)
-        adbWriter.writeOpen(localId, destination)
-        val message = messageQueue.take(localId, Constants.CMD_OKAY)
-        val remoteId = message.arg0
-        return AdbStream(messageQueue, adbWriter, maxPayloadSize, localId, remoteId)
-    }
-
     private fun newId(): Int {
         return Random.nextInt()
+    }
+
+    @TestOnly
+    internal fun ensureEmpty() {
+        messageQueue.ensureEmpty()
     }
 
     override fun close() {
@@ -127,10 +132,5 @@ class AdbConnection internal constructor(
             adbWriter.close()
             closeable?.close()
         } catch (ignore: Throwable) {}
-    }
-
-    @TestOnly
-    internal fun ensureEmpty() {
-        messageQueue.ensureEmpty()
     }
 }
