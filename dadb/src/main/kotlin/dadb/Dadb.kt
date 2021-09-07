@@ -48,6 +48,7 @@ interface Dadb : AutoCloseable {
 
     companion object {
 
+        @JvmStatic
         fun create(host: String, port: Int, keyPair: AdbKeyPair? = null): Dadb = DadbImpl(host, port, keyPair)
     }
 }

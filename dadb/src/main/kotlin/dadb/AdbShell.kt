@@ -15,6 +15,8 @@
  *
  */
 
+@file:JvmName("AdbShell")
+
 package dadb
 
 import java.io.IOException
