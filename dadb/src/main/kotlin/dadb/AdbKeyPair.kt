@@ -66,6 +66,7 @@ class AdbKeyPair(
             Security.addProvider(BouncyCastleProvider())
         }
 
+        @JvmStatic
         fun readDefault(): AdbKeyPair? {
             val privateKeyFile = File(System.getenv("HOME"), ".android/adbkey")
             val publicKeyFile = File(System.getenv("HOME"), ".android/adbkey.pub")
