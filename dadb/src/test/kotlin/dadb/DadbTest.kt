@@ -33,7 +33,7 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun basic() {
-        useDefaultConnection { connection ->
+        localEmulator { connection ->
             connection.open("shell,raw:echo hello").use { stream ->
                 val response = stream.source.readString(Charsets.UTF_8)
                 Truth.assertThat(response).isEqualTo("hello\n")
@@ -43,7 +43,7 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun openShell_read() {
-        useDefaultConnection { connection ->
+        localEmulator { connection ->
             connection.openShell("echo hello").use { shellStream ->
                 val shellResponse = shellStream.readAll()
                 assertShellResponse(shellResponse, 0, "hello\n")
@@ -53,7 +53,7 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun openShell_write() {
-        useDefaultConnection { connection ->
+        localEmulator { connection ->
             connection.openShell().use { shellStream ->
                 shellStream.write("echo hello\n")
 
@@ -70,7 +70,7 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun openShell_concurrency() {
-        useDefaultConnection { connection ->
+        localEmulator { connection ->
             launch(20) {
                 val random = Random.nextDouble()
                 connection.openShell().use { shellStream ->
@@ -91,7 +91,7 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun install() {
-        useDefaultConnection { connection ->
+        localEmulator { connection ->
             connection.install(TestApk.FILE)
             val response = connection.shell("pm list packages ${TestApk.PACKAGE_NAME}")
             assertShellResponse(response, 0, "package:${TestApk.PACKAGE_NAME}\n")
@@ -100,7 +100,7 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun uninstall() {
-        useDefaultConnection { connection ->
+        localEmulator { connection ->
             connection.install(TestApk.FILE)
             connection.uninstall(TestApk.PACKAGE_NAME)
             val response = connection.shell("pm list packages ${TestApk.PACKAGE_NAME}")
@@ -110,11 +110,11 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun root() {
-        useDefaultConnection { connection ->
+        localEmulator { connection ->
             connection.unroot()
         }
         Thread.sleep(500)
-        useDefaultConnection { connection ->
+        localEmulator { connection ->
             connection.root()
         }
         Thread.sleep(500)
@@ -122,11 +122,11 @@ internal class DadbTest : BaseConcurrencyTest() {
 
     @Test
     fun unroot() {
-        useDefaultConnection { connection ->
+        localEmulator { connection ->
             connection.root()
         }
         Thread.sleep(500)
-        useDefaultConnection { connection ->
+        localEmulator { connection ->
             connection.unroot()
         }
         Thread.sleep(500)
@@ -142,7 +142,7 @@ internal class DadbTest : BaseConcurrencyTest() {
         Truth.assertThat(shellPacket.id).isEqualTo(id)
     }
 
-    private fun useDefaultConnection(body: (connection: AdbConnection) -> Unit) {
+    private fun localEmulator(body: (connection: AdbConnection) -> Unit) {
         val socket = Socket("localhost", 5555)
         val keyPair = AdbKeyPair.readDefault()
         val connection = AdbConnection.connect(socket, keyPair)
