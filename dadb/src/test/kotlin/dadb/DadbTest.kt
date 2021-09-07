@@ -145,7 +145,7 @@ internal class DadbTest : BaseConcurrencyTest() {
     private fun localEmulator(body: (connection: AdbConnection) -> Unit) {
         val socket = Socket("localhost", 5555)
         val keyPair = AdbKeyPair.readDefault()
-        val connection = AdbConnection.connect(socket, keyPair)
+        val connection = Dadb.connect(socket, keyPair)
         connection.use(body)
         connection.ensureEmpty()
     }

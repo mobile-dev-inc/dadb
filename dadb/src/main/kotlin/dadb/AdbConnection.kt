@@ -17,15 +17,16 @@
 
 package dadb
 
-import okio.*
+import okio.Buffer
+import okio.BufferedSource
+import okio.source
 import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
 import java.io.File
 import java.io.IOException
-import java.net.Socket
 import kotlin.random.Random
 
-class AdbConnection private constructor(
+class AdbConnection internal constructor(
         adbReader: AdbReader,
         private val adbWriter: AdbWriter,
         private val closeable: Closeable?,
@@ -131,56 +132,5 @@ class AdbConnection private constructor(
     @TestOnly
     internal fun ensureEmpty() {
         messageQueue.ensureEmpty()
-    }
-
-    companion object {
-
-        @Throws(IOException::class)
-        fun connect(socket: Socket, keyPair: AdbKeyPair? = null): AdbConnection {
-            val source = socket.source()
-            val sink = socket.sink()
-            return connect(source, sink, keyPair, socket)
-        }
-
-        private fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null, closeable: Closeable? = null): AdbConnection {
-            val adbReader = AdbReader(source)
-            val adbWriter = AdbWriter(sink)
-
-            try {
-                return connect(adbReader, adbWriter, keyPair, closeable)
-            } catch (t: Throwable) {
-                adbReader.close()
-                adbWriter.close()
-                throw t
-            }
-        }
-
-        private fun connect(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair?, closeable: Closeable?): AdbConnection {
-            adbWriter.writeConnect()
-
-            var message = adbReader.readMessage()
-
-            if (message.command == Constants.CMD_AUTH) {
-                checkNotNull(keyPair) { "Authentication required but no KeyPair provided" }
-                check(message.arg0 == Constants.AUTH_TYPE_TOKEN) { "Unsupported auth type: $message" }
-
-                val signature = keyPair.signPayload(message)
-                adbWriter.writeAuth(Constants.AUTH_TYPE_SIGNATURE, signature)
-
-                message = adbReader.readMessage()
-                if (message.command == Constants.CMD_AUTH) {
-                    adbWriter.writeAuth(Constants.AUTH_TYPE_RSA_PUBLIC, keyPair.publicKeyBytes)
-                    message = adbReader.readMessage()
-                }
-            }
-
-            if (message.command != Constants.CMD_CNXN) throw IOException("Connection failed: $message")
-
-            val connectionString = String(message.payload)
-            val version = message.arg0
-            val maxPayloadSize = message.arg1
-
-            return AdbConnection(adbReader, adbWriter, closeable, connectionString, version, maxPayloadSize)
-        }
     }
 }
