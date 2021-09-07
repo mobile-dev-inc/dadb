@@ -17,6 +17,12 @@
 
 package dadb
 
+const val ID_STDIN = 0
+const val ID_STDOUT = 1
+const val ID_STDERR = 2
+const val ID_EXIT = 3
+const val ID_CLOSE_STDIN = 3
+
 class AdbShellStream(
         private val stream: AdbStream
 ) : AutoCloseable {
@@ -27,11 +33,11 @@ class AdbShellStream(
         while (true) {
             val packet = read()
             val id = packet.id
-            if (id == Constants.SHELL_ID_EXIT) {
+            if (id == ID_EXIT) {
                 val exitCode = packet.payload[0].toInt()
                 return AdbShellResponse(output.toString(), errorOutput.toString(), exitCode)
-            } else if (id == Constants.SHELL_ID_STDOUT || id == Constants.SHELL_ID_STDERR) {
-                val sb = if (id == Constants.SHELL_ID_STDOUT) output else errorOutput
+            } else if (id == ID_STDOUT || id == ID_STDERR) {
+                val sb = if (id == ID_STDOUT) output else errorOutput
                 sb.append(String(packet.payload))
             } else {
                 throw IllegalStateException("Invalid shell packet id: $id")
@@ -49,7 +55,7 @@ class AdbShellStream(
     }
 
     fun write(string: String) {
-        write(Constants.SHELL_ID_STDIN, string.toByteArray())
+        write(ID_STDIN, string.toByteArray())
     }
 
     fun write(id: Int, payload: ByteArray? = null) {
@@ -66,7 +72,7 @@ class AdbShellStream(
     }
 
     private fun checkId(id: Int): Int {
-        check(id == Constants.SHELL_ID_STDOUT || id == Constants.SHELL_ID_STDERR || id == Constants.SHELL_ID_EXIT) {
+        check(id == ID_STDOUT || id == ID_STDERR || id == ID_EXIT) {
             "Invalid shell packet id: $id"
         }
         return id
@@ -74,7 +80,7 @@ class AdbShellStream(
 
     private fun checkLength(id: Int, length: Int): Int {
         check(length >= 0) { "Shell packet length must be >= 0: $length" }
-        check(id != Constants.SHELL_ID_EXIT || length == 1) { "Shell exit packet does not have payload length == 1: $length" }
+        check(id != ID_EXIT || length == 1) { "Shell exit packet does not have payload length == 1: $length" }
         return length
     }
 }
@@ -89,13 +95,13 @@ class AdbShellPacket(
     companion object {
 
         private fun idStr(id: Int) = when(id) {
-            Constants.SHELL_ID_STDOUT -> "STDOUT"
-            Constants.SHELL_ID_STDERR -> "STDERR"
-            Constants.SHELL_ID_EXIT -> "EXIT"
+            ID_STDOUT -> "STDOUT"
+            ID_STDERR -> "STDERR"
+            ID_EXIT -> "EXIT"
             else -> throw IllegalArgumentException("Invalid shell packet id: $id")
         }
 
-        private fun payloadStr(id: Int, payload: ByteArray) = if (id == Constants.SHELL_ID_EXIT) {
+        private fun payloadStr(id: Int, payload: ByteArray) = if (id == ID_EXIT) {
             "${payload[0]}"
         } else {
             String(payload)

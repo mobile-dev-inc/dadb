@@ -30,12 +30,6 @@ internal object Constants {
     const val CMD_CLSE = 0x45534c43
     const val CMD_WRTE = 0x45545257
 
-    const val SHELL_ID_STDIN = 0
-    const val SHELL_ID_STDOUT = 1
-    const val SHELL_ID_STDERR = 2
-    const val SHELL_ID_EXIT = 3
-    const val SHELL_ID_CLOSE_STDIN = 3
-
     const val CONNECT_VERSION = 0x01000000
     const val CONNECT_MAXDATA = 1024 * 1024
 

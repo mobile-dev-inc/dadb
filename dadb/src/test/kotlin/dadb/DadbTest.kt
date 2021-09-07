@@ -42,9 +42,9 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
-    fun shellV2_read() {
+    fun shell_read() {
         useDefaultConnection { connection ->
-            connection.shellV2("echo hello").use { shellStream ->
+            connection.shell("echo hello").use { shellStream ->
                 val shellResponse = shellStream.readAll()
                 assertShellResponse(shellResponse, 0, "hello\n")
             }
@@ -52,13 +52,13 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
-    fun shellV2_write() {
+    fun shell_write() {
         useDefaultConnection { connection ->
-            connection.shellV2().use { shellStream ->
+            connection.shell().use { shellStream ->
                 shellStream.write("echo hello\n")
 
                 val shellPacket = shellStream.read()
-                assertShellPacket(shellPacket, Constants.SHELL_ID_STDOUT, "hello\n")
+                assertShellPacket(shellPacket, ID_STDOUT, "hello\n")
 
                 shellStream.write("exit\n")
 
@@ -69,15 +69,15 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
-    fun shellV2_concurrency() {
+    fun shell_concurrency() {
         useDefaultConnection { connection ->
             launch(20) {
                 val random = Random.nextDouble()
-                connection.shellV2().use { shellStream ->
+                connection.shell().use { shellStream ->
                     shellStream.write("echo $random\n")
 
                     val shellPacket = shellStream.read()
-                    assertShellPacket(shellPacket, Constants.SHELL_ID_STDOUT, "$random\n")
+                    assertShellPacket(shellPacket, ID_STDOUT, "$random\n")
 
                     shellStream.write("exit\n")
 

@@ -43,17 +43,17 @@ internal class AdbMessage(
     }
 
     private fun writePayloadStr(): String {
-        return shellV2WritePayloadStr()?.let { "[shell] $it" } ?: "payload[$payloadLength]"
+        return shellWritePayloadStr()?.let { "[shell] $it" } ?: "payload[$payloadLength]"
     }
 
     @Suppress("UsePropertyAccessSyntax")
-    private fun shellV2WritePayloadStr(): String? {
+    private fun shellWritePayloadStr(): String? {
         val buffer = ByteBuffer.wrap(payload, 0, payloadLength).order(ByteOrder.LITTLE_ENDIAN)
         val id = buffer.get().toInt()
         if (id < 0 || id > 3) return null
         val length = buffer.getInt()
         if (length != buffer.remaining()) return null
-        if (id == Constants.SHELL_ID_EXIT) return "EXIT[${buffer.get()}]"
+        if (id == ID_EXIT) return "EXIT[${buffer.get()}]"
         return String(payload, 5, payloadLength - 5)
     }
 
