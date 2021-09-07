@@ -49,6 +49,7 @@ internal class AdbMessage(
     @Suppress("UsePropertyAccessSyntax")
     private fun shellWritePayloadStr(): String? {
         val buffer = ByteBuffer.wrap(payload, 0, payloadLength).order(ByteOrder.LITTLE_ENDIAN)
+        if (buffer.limit() < 8) return null
         val id = buffer.get().toInt()
         if (id < 0 || id > 3) return null
         val length = buffer.getInt()
