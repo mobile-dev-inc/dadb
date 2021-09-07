@@ -3,7 +3,7 @@ name: Publish Release
 on:
   push:
     tags:
-      - '*'
+      - 'v*'
 
 jobs:
   publish:
@@ -20,8 +20,13 @@ jobs:
           distribution: 'zulu'
           java-version: 8
 
+      - name: Retrieve version
+        run: |
+          echo "VERSION_NAME=$(cat gradle.properties | grep -w "VERSION_NAME" | cut -d'=' -f2)" >> $GITHUB_ENV
+
       - name: Upload release
         run: ./gradlew publishAllPublicationsToMavenCentralRepository --no-daemon --no-parallel
+        if: ${{ !endsWith(env.VERSION_NAME, '-SNAPSHOT') }}
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.SONATYPE_NEXUS_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.SONATYPE_NEXUS_PASSWORD }}
@@ -30,6 +35,7 @@ jobs:
 
       - name: Publish release
         run: ./gradlew closeAndReleaseRepository --no-daemon --no-parallel
+        if: ${{ !endsWith(env.VERSION_NAME, '-SNAPSHOT') }}
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.SONATYPE_NEXUS_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.SONATYPE_NEXUS_PASSWORD }}
