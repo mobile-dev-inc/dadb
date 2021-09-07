@@ -86,7 +86,6 @@ internal class AdbConnection internal constructor(
 
     @Throws(IOException::class)
     override fun unroot() {
-        throw RuntimeException("unroot called")
         val response = restartAdb("unroot:")
         if (!response.startsWith("restarting") && !response.contains("not running as root")) {
             throw IOException("Failed to restart adb as root: $response")
