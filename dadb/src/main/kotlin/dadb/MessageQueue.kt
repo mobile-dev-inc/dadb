@@ -57,7 +57,7 @@ internal abstract class MessageQueue<V> {
 
     @TestOnly
     fun ensureEmpty() {
-        check(queues.isEmpty())
+        check(queues.isEmpty()) { "Queues is not empty: ${queues.keys.map { String.format("%X", it) }}" }
         check(openStreams.isEmpty())
     }
 

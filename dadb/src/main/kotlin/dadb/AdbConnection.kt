@@ -81,7 +81,7 @@ internal class AdbConnection internal constructor(
         if (!response.startsWith("restarting") && !response.contains("already")) {
             throw IOException("Failed to restart adb as root: $response")
         }
-        Thread.sleep(1000)
+        waitRootOrClose(root = true)
     }
 
     @Throws(IOException::class)
@@ -90,17 +90,34 @@ internal class AdbConnection internal constructor(
         if (!response.startsWith("restarting") && !response.contains("not running as root")) {
             throw IOException("Failed to restart adb as root: $response")
         }
-        Thread.sleep(1000)
+        waitRootOrClose(root = false)
     }
 
     @Throws(IOException::class)
     override fun open(destination: String): AdbStream {
         val localId = newId()
         messageQueue.startListening(localId)
-        adbWriter.writeOpen(localId, destination)
-        val message = messageQueue.take(localId, Constants.CMD_OKAY)
-        val remoteId = message.arg0
-        return AdbStream(messageQueue, adbWriter, maxPayloadSize, localId, remoteId)
+        try {
+            adbWriter.writeOpen(localId, destination)
+            val message = messageQueue.take(localId, Constants.CMD_OKAY)
+            val remoteId = message.arg0
+            return AdbStream(messageQueue, adbWriter, maxPayloadSize, localId, remoteId)
+        } catch (e: Throwable) {
+            messageQueue.stopListening(localId)
+            throw e
+        }
+    }
+
+    private fun waitRootOrClose(root: Boolean) {
+        while (true) {
+            try {
+                val response = shell("getprop service.adb.root")
+                val propValue = if (root) 1 else 0
+                if (response.output == "$propValue\n") return
+            } catch (e: IOException) {
+                return
+            }
+        }
     }
 
     private fun restartAdb(destination: String): String {
