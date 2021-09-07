@@ -33,10 +33,6 @@ internal abstract class BaseConcurrencyTest {
         }
     }
 
-    protected fun CompletableFuture<*>.waitFor() {
-        get(1000, TimeUnit.MILLISECONDS)
-    }
-
     protected fun waitForAll() {
         CompletableFuture.allOf(*futures.toTypedArray()).get(5000, TimeUnit.MILLISECONDS)
     }

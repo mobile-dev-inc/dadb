@@ -17,62 +17,37 @@
 
 package dadb
 
-import okio.Sink
-import okio.Source
-import okio.sink
-import okio.source
-import java.io.Closeable
+import java.io.File
 import java.io.IOException
-import java.net.Socket
 
-object Dadb {
+interface Dadb : AutoCloseable {
 
-    @JvmStatic
     @Throws(IOException::class)
-    fun connect(socket: Socket, keyPair: AdbKeyPair? = null): AdbConnection {
-        val source = socket.source()
-        val sink = socket.sink()
-        return connect(source, sink, keyPair, socket)
-    }
+    fun shell(command: String = ""): AdbShellResponse
 
-    private fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null, closeable: Closeable? = null): AdbConnection {
-        val adbReader = AdbReader(source)
-        val adbWriter = AdbWriter(sink)
+    @Throws(IOException::class)
+    fun openShell(command: String = ""): AdbShellStream
 
-        try {
-            return connect(adbReader, adbWriter, keyPair, closeable)
-        } catch (t: Throwable) {
-            adbReader.close()
-            adbWriter.close()
-            throw t
-        }
-    }
+    @Throws(IOException::class)
+    fun install(file: File)
 
-    private fun connect(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair?, closeable: Closeable?): AdbConnection {
-        adbWriter.writeConnect()
+    @Throws(IOException::class)
+    fun uninstall(packageName: String)
 
-        var message = adbReader.readMessage()
+    @Throws(IOException::class)
+    fun abbExec(vararg command: String): AdbStream
 
-        if (message.command == Constants.CMD_AUTH) {
-            checkNotNull(keyPair) { "Authentication required but no KeyPair provided" }
-            check(message.arg0 == Constants.AUTH_TYPE_TOKEN) { "Unsupported auth type: $message" }
+    @Throws(IOException::class)
+    fun root()
 
-            val signature = keyPair.signPayload(message)
-            adbWriter.writeAuth(Constants.AUTH_TYPE_SIGNATURE, signature)
+    @Throws(IOException::class)
+    fun unroot()
 
-            message = adbReader.readMessage()
-            if (message.command == Constants.CMD_AUTH) {
-                adbWriter.writeAuth(Constants.AUTH_TYPE_RSA_PUBLIC, keyPair.publicKeyBytes)
-                message = adbReader.readMessage()
-            }
-        }
+    @Throws(IOException::class)
+    fun open(destination: String): AdbStream
 
-        if (message.command != Constants.CMD_CNXN) throw IOException("Connection failed: $message")
+    companion object {
 
-        val connectionString = String(message.payload)
-        val version = message.arg0
-        val maxPayloadSize = message.arg1
-
-        return AdbConnection(adbReader, adbWriter, closeable, connectionString, version, maxPayloadSize)
+        fun create(host: String, port: Int, keyPair: AdbKeyPair? = null): Dadb = DadbImpl(host, port, keyPair)
     }
 }
