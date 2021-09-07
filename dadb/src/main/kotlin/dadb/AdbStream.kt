@@ -37,7 +37,7 @@ class AdbStream internal constructor(
         private var bytesRead = 0
 
         override fun read(sink: Buffer, byteCount: Long): Long {
-            val message = message ?: nextMessage() ?: return -1
+            val message = message() ?: return -1
 
             val bytesRemaining = message.payloadLength - bytesRead
             val bytesToRead = Math.min(byteCount.toInt(), bytesRemaining)
@@ -56,9 +56,11 @@ class AdbStream internal constructor(
             return bytesToRead.toLong()
         }
 
-        private fun nextMessage(): AdbMessage? {
-            bytesRead = 0
-            return nextMessage(Constants.CMD_WRTE)
+        private fun message(): AdbMessage? {
+            message?.let { return it }
+            val nextMessage = nextMessage(Constants.CMD_WRTE)
+            message = nextMessage
+            return nextMessage
         }
 
         override fun close() {}
@@ -102,7 +104,7 @@ class AdbStream internal constructor(
     private fun nextMessage(command: Int): AdbMessage? {
         return try {
             messageQueue.take(localId, command)
-        } catch (e: AdbStreamClosed) {
+        } catch (e: IOException) {
             close()
             return null
         }
