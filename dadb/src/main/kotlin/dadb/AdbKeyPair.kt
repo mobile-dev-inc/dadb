@@ -67,8 +67,8 @@ class AdbKeyPair(
         }
 
         fun readDefault(): AdbKeyPair? {
-            val privateKeyFile = File(System.getenv("HOME"), ".android/adbkey2")
-            val publicKeyFile = File(System.getenv("HOME"), ".android/adbkey2.pub")
+            val privateKeyFile = File(System.getenv("HOME"), ".android/adbkey")
+            val publicKeyFile = File(System.getenv("HOME"), ".android/adbkey.pub")
             if (!privateKeyFile.exists() || !publicKeyFile.exists()) return null
 
             val privateKey = readPKCS1PrivateKey(privateKeyFile)
