@@ -37,4 +37,10 @@ internal class DadbTest {
 
         assertShellResponse(dadb.shell("echo hello2"), 0, "hello2\n")
     }
+
+    @Test
+    fun root() {
+        dadb.root()
+        dadb.unroot()
+    }
 }

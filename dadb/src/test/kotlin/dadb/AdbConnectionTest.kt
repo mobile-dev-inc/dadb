@@ -19,7 +19,6 @@ package dadb
 
 import com.google.common.truth.Truth
 import org.junit.Before
-import java.io.IOException
 import java.net.Socket
 import kotlin.random.Random
 import kotlin.test.Test
@@ -113,11 +112,9 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
         localEmulator { connection ->
             connection.unroot()
         }
-        Thread.sleep(500)
         localEmulator { connection ->
             connection.root()
         }
-        Thread.sleep(500)
     }
 
     @Test
@@ -125,11 +122,9 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
         localEmulator { connection ->
             connection.root()
         }
-        Thread.sleep(500)
         localEmulator { connection ->
             connection.unroot()
         }
-        Thread.sleep(500)
     }
 
     private fun localEmulator(body: (connection: AdbConnection) -> Unit) {
