@@ -17,11 +17,6 @@
 
 package dadb
 
-fun AdbConnection.shellV2(command: String = ""): AdbShellStream {
-    val stream = open("shell,v2,raw:$command")
-    return AdbShellStream(stream)
-}
-
 class AdbShellStream(
         private val stream: AdbStream
 ) : AutoCloseable {

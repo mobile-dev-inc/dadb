@@ -38,6 +38,11 @@ class AdbConnection private constructor(
 
     private val messageQueue = AdbMessageQueue(adbReader)
 
+    fun shellV2(command: String = ""): AdbShellStream {
+        val stream = open("shell,v2,raw:$command")
+        return AdbShellStream(stream)
+    }
+
     fun open(destination: String): AdbStream {
         val localId = newId()
         messageQueue.startListening(localId)
