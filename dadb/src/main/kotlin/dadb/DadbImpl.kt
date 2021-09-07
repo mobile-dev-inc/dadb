@@ -38,6 +38,7 @@ internal class DadbImpl(
     override fun unroot() = connection().unroot()
     override fun open(destination: String) = connection().open(destination)
     override fun close() = connection().unroot()
+    override fun toString() = "$host:$port"
 
     @TestOnly
     fun closeConnection() {
