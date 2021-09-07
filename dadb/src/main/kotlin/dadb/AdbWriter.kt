@@ -71,7 +71,7 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
             offset: Int,
             length: Int
     ) {
-        println("(${Thread.currentThread().name}) > ${AdbMessage(command, arg0, arg1, length, 0, 0, payload ?: ByteArray(0))}")
+        log { "(${Thread.currentThread().name}) > ${AdbMessage(command, arg0, arg1, length, 0, 0, payload ?: ByteArray(0))}" }
         synchronized(bufferedSink) {
             bufferedSink.apply {
                 writeIntLe(command)
