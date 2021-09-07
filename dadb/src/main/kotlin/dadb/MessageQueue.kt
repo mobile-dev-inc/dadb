@@ -45,15 +45,6 @@ internal abstract class MessageQueue<V> {
         }
     }
 
-    fun takeUnsafe(localId: Int, command: Int): V {
-        while (true) {
-            synchronized(this) {
-                poll(localId, command)?.let { return it }
-                read()
-            }
-        }
-    }
-
     fun startListening(localId: Int) {
         openStreams.add(localId)
         queues.putIfAbsent(localId, ConcurrentHashMap())
