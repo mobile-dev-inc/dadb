@@ -37,6 +37,19 @@ class AdbConnection private constructor(
     private val messageQueue = AdbMessageQueue(adbReader)
 
     @Throws(IOException::class)
+    fun shell(command: String = ""): AdbShellResponse {
+        openShell(command).use { stream ->
+            return stream.readAll()
+        }
+    }
+
+    @Throws(IOException::class)
+    fun openShell(command: String = ""): AdbShellStream {
+        val stream = open("shell,v2,raw:$command")
+        return AdbShellStream(stream)
+    }
+
+    @Throws(IOException::class)
     fun install(file: File) {
         abbExec("package", "install", "-S", file.length().toString()).use { stream ->
             stream.sink.writeAll(file.source())
@@ -57,22 +70,40 @@ class AdbConnection private constructor(
     }
 
     @Throws(IOException::class)
-    fun shell(command: String = ""): AdbShellResponse {
-        openShell(command).use { stream ->
-            return stream.readAll()
+    fun abbExec(vararg command: String): AdbStream {
+        val destination = "abb_exec:${command.joinToString("\u0000")}"
+        return open(destination)
+    }
+
+    @Throws(IOException::class)
+    fun root() {
+        val response = restartAdb("root:")
+        if (!response.startsWith("restarting") && !response.contains("already")) {
+            throw IOException("Failed to restart adb as root: $response")
         }
     }
 
     @Throws(IOException::class)
-    fun openShell(command: String = ""): AdbShellStream {
-        val stream = open("shell,v2,raw:$command")
-        return AdbShellStream(stream)
+    fun unroot() {
+        val response = restartAdb("unroot:")
+        if (!response.startsWith("restarting") && !response.contains("not running as root")) {
+            throw IOException("Failed to restart adb as root: $response")
+        }
     }
 
-    @Throws(IOException::class)
-    fun abbExec(vararg command: String): AdbStream {
-        val destination = "abb_exec:${command.joinToString("\u0000")}"
-        return open(destination)
+    private fun restartAdb(destination: String): String {
+        open(destination).use { stream ->
+            return stream.source.readUntil('\n'.toByte()).readString(Charsets.UTF_8)
+        }
+    }
+
+    private fun BufferedSource.readUntil(endByte: Byte): Buffer {
+        val buffer = Buffer()
+        while (true) {
+            val b = readByte()
+            buffer.writeByte(b.toInt())
+            if (b == endByte) return buffer
+        }
     }
 
     @Throws(IOException::class)

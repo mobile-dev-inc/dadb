@@ -108,6 +108,30 @@ internal class DadbTest : BaseConcurrencyTest() {
         }
     }
 
+    @Test
+    fun root() {
+        useDefaultConnection { connection ->
+            connection.unroot()
+        }
+        Thread.sleep(500)
+        useDefaultConnection { connection ->
+            connection.root()
+        }
+        Thread.sleep(500)
+    }
+
+    @Test
+    fun unroot() {
+        useDefaultConnection { connection ->
+            connection.root()
+        }
+        Thread.sleep(500)
+        useDefaultConnection { connection ->
+            connection.unroot()
+        }
+        Thread.sleep(500)
+    }
+
     private fun assertShellResponse(shellResponse: AdbShellResponse, exitCode: Int, allOutput: String) {
         Truth.assertThat(shellResponse.allOutput).isEqualTo(allOutput)
         Truth.assertThat(shellResponse.exitCode).isEqualTo(exitCode)
