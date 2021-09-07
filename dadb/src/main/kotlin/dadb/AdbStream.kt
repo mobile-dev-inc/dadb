@@ -18,6 +18,8 @@
 package dadb
 
 import okio.*
+import java.lang.Integer.min
+import java.nio.ByteBuffer
 
 class AdbStream internal constructor(
         private val messageQueue: AdbMessageQueue,
@@ -66,20 +68,31 @@ class AdbStream internal constructor(
 
     val sink = object : Sink {
 
-        private val buf = ByteArray(maxPayloadSize)
+        private val buffer = ByteBuffer.allocate(maxPayloadSize)
 
         override fun write(source: Buffer, byteCount: Long) {
-            var bytesRemaining = byteCount.toInt()
-            while (bytesRemaining > 0) {
-                val bytesToWrite = Math.min(maxPayloadSize, bytesRemaining)
-                val bytesRead = source.read(buf, 0, bytesToWrite)
-                adbWriter.writeWrite(localId, remoteId, buf, 0, bytesRead)
-                bytesRemaining -= bytesRead
+            var remainingBytes = byteCount
+            while (true) {
+                remainingBytes -= writeToBuffer(source, byteCount)
+                if (remainingBytes == 0L) return
+                check(remainingBytes > 0L)
             }
-            check(bytesRemaining == 0)
         }
 
-        override fun flush() {}
+        private fun writeToBuffer(source: BufferedSource, byteCount: Long): Int {
+            val bytesToWrite = min(buffer.remaining(), byteCount.toInt())
+            val bytesWritten = source.read(buffer.array(), buffer.position(), bytesToWrite)
+
+            buffer.position(buffer.position() + bytesWritten)
+            if (buffer.remaining() == 0) flush()
+
+            return bytesWritten
+        }
+
+        override fun flush() {
+            adbWriter.writeWrite(localId, remoteId, buffer.array(), 0, buffer.position())
+            buffer.flip()
+        }
 
         override fun close() {}
 
