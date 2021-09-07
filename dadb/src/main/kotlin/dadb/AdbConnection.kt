@@ -81,7 +81,7 @@ internal class AdbConnection internal constructor(
         if (!response.startsWith("restarting") && !response.contains("already")) {
             throw IOException("Failed to restart adb as root: $response")
         }
-        Thread.sleep(500)
+        Thread.sleep(1000)
     }
 
     @Throws(IOException::class)
@@ -90,7 +90,7 @@ internal class AdbConnection internal constructor(
         if (!response.startsWith("restarting") && !response.contains("not running as root")) {
             throw IOException("Failed to restart adb as root: $response")
         }
-        Thread.sleep(500)
+        Thread.sleep(1000)
     }
 
     @Throws(IOException::class)

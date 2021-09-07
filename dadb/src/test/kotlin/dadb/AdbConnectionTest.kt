@@ -109,21 +109,21 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
 
     @Test
     fun root() {
+        localEmulator(Dadb::unroot)
+        localEmulator(Dadb::root)
         localEmulator { dadb ->
-            dadb.unroot()
-        }
-        localEmulator { dadb ->
-            dadb.root()
+            val response = dadb.shell("getprop service.adb.root")
+            assertShellResponse(response, 0, "1\n")
         }
     }
 
     @Test
     fun unroot() {
+        localEmulator(Dadb::root)
+        localEmulator(Dadb::unroot)
         localEmulator { dadb ->
-            dadb.root()
-        }
-        localEmulator { dadb ->
-            dadb.unroot()
+            val response = dadb.shell("getprop service.adb.root")
+            assertShellResponse(response, 0, "0\n")
         }
     }
 
