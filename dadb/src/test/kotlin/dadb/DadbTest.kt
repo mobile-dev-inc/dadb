@@ -19,6 +19,7 @@ package dadb
 
 import com.google.common.truth.Truth
 import org.junit.After
+import kotlin.test.Ignore
 import kotlin.test.Test
 
 internal class DadbTest {
@@ -39,6 +40,7 @@ internal class DadbTest {
         assertShellResponse(dadb.shell("echo hello2"), 0, "hello2\n")
     }
 
+    @Ignore
     @Test
     fun root() {
         dadb.root()

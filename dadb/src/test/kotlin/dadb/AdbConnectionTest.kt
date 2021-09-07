@@ -21,6 +21,7 @@ import com.google.common.truth.Truth
 import org.junit.Before
 import java.net.Socket
 import kotlin.random.Random
+import kotlin.test.Ignore
 import kotlin.test.Test
 
 internal class AdbConnectionTest : BaseConcurrencyTest() {
@@ -107,6 +108,7 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
         }
     }
 
+    @Ignore
     @Test
     fun root() {
         localEmulator(Dadb::unroot)
@@ -117,6 +119,7 @@ internal class AdbConnectionTest : BaseConcurrencyTest() {
         }
     }
 
+    @Ignore
     @Test
     fun unroot() {
         localEmulator(Dadb::root)
