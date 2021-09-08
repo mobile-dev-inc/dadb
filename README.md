@@ -1,6 +1,6 @@
 # dadb
 
-A Kotlin/Java library to connect directly to an Android device via ADB without an `adb` binary or running ADB server.
+A Kotlin/Java library to connect directly to an Android device without an adb binary or a running ADB server
 
 ## Usage
 
