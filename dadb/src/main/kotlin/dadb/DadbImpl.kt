@@ -49,12 +49,17 @@ internal class DadbImpl(
 
     @Synchronized
     private fun connection(): AdbConnection {
-        val connection = connection
-        return if (connection == null || connection.second.isClosed) {
-            val socket = Socket(host, port)
-            AdbConnection.connect(socket, keyPair)
-        } else {
-            connection.first
+        var connection = connection
+        if (connection == null || connection.second.isClosed) {
+            connection = newConnection()
+            this.connection = connection
         }
+        return connection.first
+    }
+
+    private fun newConnection(): Pair<AdbConnection, Socket> {
+        val socket = Socket(host, port)
+        val adbConnection = AdbConnection.connect(socket, keyPair)
+        return adbConnection to socket
     }
 }
