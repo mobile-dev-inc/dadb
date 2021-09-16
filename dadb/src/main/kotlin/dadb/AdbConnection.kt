@@ -23,7 +23,7 @@ import java.io.Closeable
 import java.io.File
 import java.io.IOException
 import java.net.Socket
-import kotlin.random.Random
+import java.util.*
 
 internal class AdbConnection internal constructor(
         adbReader: AdbReader,
@@ -34,6 +34,7 @@ internal class AdbConnection internal constructor(
         private val maxPayloadSize: Int
 ) : Dadb {
 
+    private val random = Random()
     private val messageQueue = AdbMessageQueue(adbReader)
 
     @Throws(IOException::class)
@@ -136,7 +137,7 @@ internal class AdbConnection internal constructor(
     }
 
     private fun newId(): Int {
-        return Random.nextInt()
+        return random.nextInt()
     }
 
     @TestOnly
