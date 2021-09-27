@@ -2,13 +2,40 @@
 
 A Kotlin/Java library to connect directly to an Android device without an adb binary or a running ADB server
 
-## Usage
-
-Gradle dependency
+## Gradle dependency
 
 [![Maven Central](https://img.shields.io/maven-central/v/dev.mobile/dadb.svg)](https://mvnrepository.com/artifact/dev.mobile/dadb)
 ```kotlin
 dependencies {
   implementation("dev.mobile:dadb:<version>")
 }
+```
+
+## Example Usage
+
+Connect to `emulator-5554` and install `apkFile`:
+
+```kotlin
+Dadb.create("localhost", 5555).use { dadb ->
+    dadb.install(apkFile)
+}
+```
+
+*Note: Connect to the odd adb daemon port (5555), not the even emulator console port (5554)*
+
+## Discover a Device
+
+Searches `localhost` ports `5555` through `5683` for a valid adb device:  
+
+```kotlin
+val dadb = Dadb.discover("localhost")
+if (dadb == null) throw RuntimeException("No adb device found")
+```
+
+## Execute Shell Command
+
+```kotlin
+val response = dadb.shell("echo hello")
+assert(response.exitCode == 0)
+assert(response.output == "hello\n")
 ```
