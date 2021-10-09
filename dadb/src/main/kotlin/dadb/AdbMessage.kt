@@ -52,12 +52,12 @@ internal class AdbMessage(
     @Suppress("UsePropertyAccessSyntax")
     private fun shellPayloadStr(): String? {
         val source: BufferedSource = getSource()
-        if (source.buffer.size < 8) return null
+        if (source.buffer.size < 5) return null
         val id = source.readByte().toInt()
         if (id < 0 || id > 3) return null
         val length = source.readIntLe()
         if (length != source.buffer.size.toInt()) return null
-        if (id == ID_EXIT) return "EXIT[${source.readByte()}]"
+        if (id == ID_EXIT) return "[shell] exit(${source.readByte()})"
         val payload = String(payload, 5, payloadLength - 5)
         return "[shell] $payload"
     }
