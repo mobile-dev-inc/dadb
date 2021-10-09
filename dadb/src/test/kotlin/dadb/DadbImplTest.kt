@@ -18,8 +18,8 @@
 package dadb
 
 import com.google.common.truth.Truth
-import org.junit.After
-import org.junit.Before
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Ignore
 import kotlin.test.Test
 
@@ -27,12 +27,12 @@ internal class DadbImplTest {
 
     private val dadb = Dadb.create("localhost", 5555, keyPair = AdbKeyPair.readDefault()) as DadbImpl
 
-    @Before
+    @BeforeTest
     internal fun setUp() {
         killServer()
     }
 
-    @After
+    @AfterTest
     fun tearDown() {
         dadb.close()
     }

@@ -17,21 +17,20 @@
 
 package dadb
 
-import com.google.common.truth.Truth
 import com.google.common.truth.Truth.assertThat
 import okio.Buffer
 import okio.source
-import org.junit.Before
 import java.io.ByteArrayInputStream
 import java.net.Socket
 import java.nio.charset.StandardCharsets
-import kotlin.random.Random
+import java.util.*
+import kotlin.test.BeforeTest
 import kotlin.test.Ignore
 import kotlin.test.Test
 
 internal class DadbTest : BaseConcurrencyTest() {
 
-    @Before
+    @BeforeTest
     fun setUp() {
         killServer()
     }
@@ -77,7 +76,7 @@ internal class DadbTest : BaseConcurrencyTest() {
     fun openShell_concurrency() {
         localEmulator { dadb ->
             launch(20) {
-                val random = Random.nextDouble()
+                val random = Random().nextDouble()
                 dadb.openShell().use { shellStream ->
                     shellStream.write("echo $random\n")
 

@@ -18,16 +18,16 @@
 package dadb
 
 import com.google.common.truth.Truth
-import org.junit.Before
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
+import kotlin.test.BeforeTest
 
 internal class MessageQueueTest : BaseConcurrencyTest() {
 
     private val messageQueue = TestMessageQueue()
 
-    @Before
+    @BeforeTest
     fun setUp() {
         messageQueue.startListening(0)
         messageQueue.startListening(1)
