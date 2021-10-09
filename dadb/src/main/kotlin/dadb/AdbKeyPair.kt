@@ -17,13 +17,8 @@
 
 package dadb
 
-import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
-import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.bouncycastle.openssl.PEMParser
-import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
 import java.io.File
 import java.security.PrivateKey
-import java.security.Security
 import javax.crypto.Cipher
 
 class AdbKeyPair(
@@ -62,10 +57,6 @@ class AdbKeyPair(
                 0x04u, 0x14u
         ).toByteArray()
 
-        init {
-            Security.addProvider(BouncyCastleProvider())
-        }
-
         @JvmStatic
         fun readDefault(): AdbKeyPair? {
             val privateKeyFile = File(System.getenv("HOME"), ".android/adbkey")
@@ -77,7 +68,7 @@ class AdbKeyPair(
         fun read(privateKeyFile: File, publicKeyFile: File): AdbKeyPair? {
             if (!privateKeyFile.exists() || !publicKeyFile.exists()) return null
 
-            val privateKey = readPKCS1PrivateKey(privateKeyFile)
+            val privateKey = PKCS8.parse(privateKeyFile.readBytes())
             val publicKeyBytes = readAdbPublicKey(publicKeyFile)
 
             return AdbKeyPair(privateKey, publicKeyBytes)
@@ -88,14 +79,6 @@ class AdbKeyPair(
             val publicKeyBytes = bytes.copyOf(bytes.size + 1)
             publicKeyBytes[bytes.size] = 0
             return publicKeyBytes
-        }
-
-        private fun readPKCS1PrivateKey(file: File): PrivateKey {
-            val privateKeyInfo = file.bufferedReader().use {
-                PrivateKeyInfo.getInstance(PEMParser(it).readObject())
-            }
-            val converter = JcaPEMKeyConverter().setProvider("BC")
-            return converter.getPrivateKey(privateKeyInfo)
         }
     }
 }

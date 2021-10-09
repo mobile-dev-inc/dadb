@@ -19,12 +19,18 @@ package dadb
 
 import com.google.common.truth.Truth
 import org.junit.After
+import org.junit.Before
 import kotlin.test.Ignore
 import kotlin.test.Test
 
 internal class DadbImplTest {
 
-    private val dadb = Dadb.create("localhost", 5555) as DadbImpl
+    private val dadb = Dadb.create("localhost", 5555, keyPair = AdbKeyPair.readDefault()) as DadbImpl
+
+    @Before
+    internal fun setUp() {
+        killServer()
+    }
 
     @After
     fun tearDown() {
@@ -49,7 +55,7 @@ internal class DadbImplTest {
 
     @Test
     fun discover() {
-        val dadb = Dadb.discover("localhost") ?: fail("Failed to discover emulator")
+        val dadb = Dadb.discover("localhost", AdbKeyPair.readDefault()) ?: fail("Failed to discover emulator")
         assertShellResponse(dadb.shell("echo hello"), 0, "hello\n")
     }
 
