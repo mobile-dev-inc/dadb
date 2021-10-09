@@ -18,8 +18,13 @@
 package dadb
 
 import com.google.common.truth.Truth
+import com.google.common.truth.Truth.assertThat
+import okio.Buffer
+import okio.source
 import org.junit.Before
+import java.io.ByteArrayInputStream
 import java.net.Socket
+import java.nio.charset.StandardCharsets
 import kotlin.random.Random
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -36,7 +41,7 @@ internal class DadbTest : BaseConcurrencyTest() {
         localEmulator { dadb ->
             dadb.open("shell,raw:echo hello").use { stream ->
                 val response = stream.source.readString(Charsets.UTF_8)
-                Truth.assertThat(response).isEqualTo("hello\n")
+                assertThat(response).isEqualTo("hello\n")
             }
         }
     }
@@ -86,6 +91,23 @@ internal class DadbTest : BaseConcurrencyTest() {
                 }
             }
             waitForAll()
+        }
+    }
+
+    @Test
+    fun adbPushPull() {
+        localEmulator { dadb ->
+            val content = "content"
+            val remotePath = "/data/local/tmp/hello"
+
+            val source = ByteArrayInputStream(content.toByteArray()).source()
+            dadb.push(source, remotePath, 439, System.currentTimeMillis())
+
+            val buffer = Buffer()
+            dadb.pull(buffer, remotePath)
+            val pulledContent = buffer.readString(StandardCharsets.UTF_8)
+
+            assertThat(pulledContent).isEqualTo(content)
         }
     }
 

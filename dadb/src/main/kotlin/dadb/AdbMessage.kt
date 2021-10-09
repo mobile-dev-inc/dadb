@@ -17,8 +17,9 @@
 
 package dadb
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import okio.Buffer
+import okio.BufferedSource
+import java.nio.charset.StandardCharsets
 
 internal class AdbMessage(
         val command: Int,
@@ -43,19 +44,35 @@ internal class AdbMessage(
     }
 
     private fun writePayloadStr(): String {
-        return shellWritePayloadStr()?.let { "[shell] $it" } ?: "payload[$payloadLength]"
+        shellPayloadStr()?.let { return it }
+        syncPayloadStr()?.let { return it }
+        return  "payload[$payloadLength]"
     }
 
     @Suppress("UsePropertyAccessSyntax")
-    private fun shellWritePayloadStr(): String? {
-        val buffer = ByteBuffer.wrap(payload, 0, payloadLength).order(ByteOrder.LITTLE_ENDIAN)
-        if (buffer.limit() < 8) return null
-        val id = buffer.get().toInt()
+    private fun shellPayloadStr(): String? {
+        val source: BufferedSource = getSource()
+        if (source.buffer.size < 8) return null
+        val id = source.readByte().toInt()
         if (id < 0 || id > 3) return null
-        val length = buffer.getInt()
-        if (length != buffer.remaining()) return null
-        if (id == ID_EXIT) return "EXIT[${buffer.get()}]"
-        return String(payload, 5, payloadLength - 5)
+        val length = source.readIntLe()
+        if (length != source.buffer.size.toInt()) return null
+        if (id == ID_EXIT) return "EXIT[${source.readByte()}]"
+        val payload = String(payload, 5, payloadLength - 5)
+        return "[shell] $payload"
+    }
+
+    private fun syncPayloadStr(): String? {
+        val source: BufferedSource = getSource()
+        if (source.buffer.size < 8) return null
+        val id = source.readString(4, StandardCharsets.UTF_8)
+        if (id !in SYNC_IDS) return null
+        val arg = source.readIntLe()
+        return "[sync] $id($arg)"
+    }
+
+    private fun getSource(): BufferedSource {
+        return Buffer().apply { write(payload, 0, payloadLength) }
     }
 
     private fun argStr(arg: Int) = String.format("%X", arg)

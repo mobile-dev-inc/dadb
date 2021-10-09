@@ -17,9 +17,7 @@
 
 package dadb
 
-import okio.Buffer
-import okio.BufferedSource
-import okio.source
+import okio.*
 import java.io.File
 import java.io.IOException
 
@@ -39,6 +37,26 @@ interface Dadb : AutoCloseable {
     fun openShell(command: String = ""): AdbShellStream {
         val stream = open("shell,v2,raw:$command")
         return AdbShellStream(stream)
+    }
+
+    @Throws(IOException::class)
+    fun push(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
+        openSync().use { stream ->
+            stream.send(source, remotePath, mode, lastModifiedMs)
+        }
+    }
+
+    @Throws(IOException::class)
+    fun pull(sink: Sink, remotePath: String) {
+        openSync().use { stream ->
+            stream.recv(sink, remotePath)
+        }
+    }
+
+    @Throws(IOException::class)
+    fun openSync(): AdbSyncStream {
+        val stream = open("sync:")
+        return AdbSyncStream(stream)
     }
 
     @Throws(IOException::class)

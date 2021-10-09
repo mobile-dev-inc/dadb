@@ -94,7 +94,7 @@ class AdbStream internal constructor(
 
         override fun flush() {
             adbWriter.writeWrite(localId, remoteId, buffer.array(), 0, buffer.position())
-            buffer.flip()
+            buffer.clear()
         }
 
         override fun close() {}
