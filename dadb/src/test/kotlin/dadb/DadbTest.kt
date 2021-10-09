@@ -20,6 +20,8 @@ package dadb
 import com.google.common.truth.Truth.assertThat
 import okio.Buffer
 import okio.source
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
 import java.net.Socket
 import java.nio.charset.StandardCharsets
@@ -30,8 +32,13 @@ import kotlin.test.Test
 
 internal class DadbTest : BaseConcurrencyTest() {
 
+    @JvmField
+    @Rule
+    val temporaryFolder = TemporaryFolder()
+
     @BeforeTest
     fun setUp() {
+        temporaryFolder.create()
         killServer()
     }
 
@@ -107,6 +114,22 @@ internal class DadbTest : BaseConcurrencyTest() {
             val pulledContent = buffer.readString(StandardCharsets.UTF_8)
 
             assertThat(pulledContent).isEqualTo(content)
+        }
+    }
+
+    @Test
+    fun adbPushPull_file() {
+        localEmulator { dadb ->
+            val content = "content"
+            val remotePath = "/data/local/tmp/hello"
+            val localSrcFile = temporaryFolder.newFile().apply { writeText(content) }
+
+            dadb.push(localSrcFile, remotePath, 439, System.currentTimeMillis())
+
+            val localDstFile = temporaryFolder.newFile()
+            dadb.pull(localDstFile, remotePath)
+
+            assertThat(localDstFile.readText()).isEqualTo(content)
         }
     }
 

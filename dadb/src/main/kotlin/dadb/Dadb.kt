@@ -20,6 +20,7 @@ package dadb
 import okio.*
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
 
 interface Dadb : AutoCloseable {
 
@@ -40,10 +41,20 @@ interface Dadb : AutoCloseable {
     }
 
     @Throws(IOException::class)
+    fun push(src: File, remotePath: String, mode: Int = readMode(src), lastModifiedMs: Long = src.lastModified()) {
+        push(src.source(), remotePath, mode, lastModifiedMs)
+    }
+
+    @Throws(IOException::class)
     fun push(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
         openSync().use { stream ->
             stream.send(source, remotePath, mode, lastModifiedMs)
         }
+    }
+
+    @Throws(IOException::class)
+    fun pull(dst: File, remotePath: String) {
+        pull(dst.sink(append = false), remotePath)
     }
 
     @Throws(IOException::class)
@@ -148,6 +159,10 @@ interface Dadb : AutoCloseable {
                 buffer.writeByte(b.toInt())
                 if (b == endByte) return buffer
             }
+        }
+
+        private fun readMode(file: File): Int {
+            return Files.getAttribute(file.toPath(), "unix:mode") as? Int ?: throw RuntimeException("Unable to read file mode")
         }
     }
 }
