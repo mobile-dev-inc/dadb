@@ -17,10 +17,12 @@
 
 package dadb
 
-import okio.*
+import okio.Sink
+import okio.Source
+import okio.sink
+import okio.source
 import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
-import java.io.File
 import java.io.IOException
 import java.net.Socket
 import java.util.*
@@ -32,70 +34,13 @@ internal class AdbConnection internal constructor(
         private val connectionString: String,
         private val version: Int,
         private val maxPayloadSize: Int
-) : Dadb {
+) : AutoCloseable {
 
     private val random = Random()
     private val messageQueue = AdbMessageQueue(adbReader)
 
     @Throws(IOException::class)
-    override fun shell(command: String): AdbShellResponse {
-        openShell(command).use { stream ->
-            return stream.readAll()
-        }
-    }
-
-    @Throws(IOException::class)
-    override fun openShell(command: String): AdbShellStream {
-        val stream = open("shell,v2,raw:$command")
-        return AdbShellStream(stream)
-    }
-
-    @Throws(IOException::class)
-    override fun install(file: File) {
-        abbExec("package", "install", "-S", file.length().toString()).use { stream ->
-            stream.sink.writeAll(file.source())
-            stream.sink.flush()
-            val response = stream.source.readString(Charsets.UTF_8)
-            if (!response.startsWith("Success")) {
-                throw IOException("Install failed: $response")
-            }
-        }
-    }
-
-    @Throws(IOException::class)
-    override fun uninstall(packageName: String) {
-        val response = shell("cmd package uninstall $packageName")
-        if (response.exitCode != 0) {
-            throw IOException("Uninstall failed: ${response.allOutput}")
-        }
-    }
-
-    @Throws(IOException::class)
-    override fun abbExec(vararg command: String): AdbStream {
-        val destination = "abb_exec:${command.joinToString("\u0000")}"
-        return open(destination)
-    }
-
-    @Throws(IOException::class)
-    override fun root() {
-        val response = restartAdb("root:")
-        if (!response.startsWith("restarting") && !response.contains("already")) {
-            throw IOException("Failed to restart adb as root: $response")
-        }
-        waitRootOrClose(root = true)
-    }
-
-    @Throws(IOException::class)
-    override fun unroot() {
-        val response = restartAdb("unroot:")
-        if (!response.startsWith("restarting") && !response.contains("not running as root")) {
-            throw IOException("Failed to restart adb as root: $response")
-        }
-        waitRootOrClose(root = false)
-    }
-
-    @Throws(IOException::class)
-    override fun open(destination: String): AdbStream {
+    fun open(destination: String): AdbStream {
         val localId = newId()
         messageQueue.startListening(localId)
         try {
@@ -106,33 +51,6 @@ internal class AdbConnection internal constructor(
         } catch (e: Throwable) {
             messageQueue.stopListening(localId)
             throw e
-        }
-    }
-
-    private fun waitRootOrClose(root: Boolean) {
-        while (true) {
-            try {
-                val response = shell("getprop service.adb.root")
-                val propValue = if (root) 1 else 0
-                if (response.output == "$propValue\n") return
-            } catch (e: IOException) {
-                return
-            }
-        }
-    }
-
-    private fun restartAdb(destination: String): String {
-        open(destination).use { stream ->
-            return stream.source.readUntil('\n'.toByte()).readString(Charsets.UTF_8)
-        }
-    }
-
-    private fun BufferedSource.readUntil(endByte: Byte): Buffer {
-        val buffer = Buffer()
-        while (true) {
-            val b = readByte()
-            buffer.writeByte(b.toInt())
-            if (b == endByte) return buffer
         }
     }
 

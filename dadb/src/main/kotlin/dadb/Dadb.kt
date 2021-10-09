@@ -17,34 +17,73 @@
 
 package dadb
 
+import okio.Buffer
+import okio.BufferedSource
+import okio.source
 import java.io.File
 import java.io.IOException
 
 interface Dadb : AutoCloseable {
 
     @Throws(IOException::class)
-    fun shell(command: String = ""): AdbShellResponse
-
-    @Throws(IOException::class)
-    fun openShell(command: String = ""): AdbShellStream
-
-    @Throws(IOException::class)
-    fun install(file: File)
-
-    @Throws(IOException::class)
-    fun uninstall(packageName: String)
-
-    @Throws(IOException::class)
-    fun abbExec(vararg command: String): AdbStream
-
-    @Throws(IOException::class)
-    fun root()
-
-    @Throws(IOException::class)
-    fun unroot()
-
-    @Throws(IOException::class)
     fun open(destination: String): AdbStream
+
+    @Throws(IOException::class)
+    fun shell(command: String): AdbShellResponse {
+        openShell(command).use { stream ->
+            return stream.readAll()
+        }
+    }
+
+    @Throws(IOException::class)
+    fun openShell(command: String = ""): AdbShellStream {
+        val stream = open("shell,v2,raw:$command")
+        return AdbShellStream(stream)
+    }
+
+    @Throws(IOException::class)
+    fun install(file: File) {
+        abbExec("package", "install", "-S", file.length().toString()).use { stream ->
+            stream.sink.writeAll(file.source())
+            stream.sink.flush()
+            val response = stream.source.readString(Charsets.UTF_8)
+            if (!response.startsWith("Success")) {
+                throw IOException("Install failed: $response")
+            }
+        }
+    }
+
+    @Throws(IOException::class)
+    fun uninstall(packageName: String) {
+        val response = shell("cmd package uninstall $packageName")
+        if (response.exitCode != 0) {
+            throw IOException("Uninstall failed: ${response.allOutput}")
+        }
+    }
+
+    @Throws(IOException::class)
+    fun abbExec(vararg command: String): AdbStream {
+        val destination = "abb_exec:${command.joinToString("\u0000")}"
+        return open(destination)
+    }
+
+    @Throws(IOException::class)
+    fun root() {
+        val response = restartAdb(this, "root:")
+        if (!response.startsWith("restarting") && !response.contains("already")) {
+            throw IOException("Failed to restart adb as root: $response")
+        }
+        waitRootOrClose(this, root = true)
+    }
+
+    @Throws(IOException::class)
+    fun unroot() {
+        val response = restartAdb(this, "unroot:")
+        if (!response.startsWith("restarting") && !response.contains("not running as root")) {
+            throw IOException("Failed to restart adb as root: $response")
+        }
+        waitRootOrClose(this, root = false)
+    }
 
     companion object {
 
@@ -64,6 +103,33 @@ interface Dadb : AutoCloseable {
                 } catch (ignore : Throwable) {}
             }
             return null
+        }
+
+        private fun waitRootOrClose(dadb: Dadb, root: Boolean) {
+            while (true) {
+                try {
+                    val response = dadb.shell("getprop service.adb.root")
+                    val propValue = if (root) 1 else 0
+                    if (response.output == "$propValue\n") return
+                } catch (e: IOException) {
+                    return
+                }
+            }
+        }
+
+        private fun restartAdb(dadb: Dadb, destination: String): String {
+            dadb.open(destination).use { stream ->
+                return stream.source.readUntil('\n'.toByte()).readString(Charsets.UTF_8)
+            }
+        }
+
+        private fun BufferedSource.readUntil(endByte: Byte): Buffer {
+            val buffer = Buffer()
+            while (true) {
+                val b = readByte()
+                buffer.writeByte(b.toInt())
+                if (b == endByte) return buffer
+            }
         }
     }
 }

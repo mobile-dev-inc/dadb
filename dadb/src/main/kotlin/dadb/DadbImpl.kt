@@ -18,7 +18,6 @@
 package dadb
 
 import org.jetbrains.annotations.TestOnly
-import java.io.File
 import java.net.Socket
 
 internal class DadbImpl(
@@ -29,14 +28,8 @@ internal class DadbImpl(
 
     private var connection: Pair<AdbConnection, Socket>? = null
 
-    override fun shell(command: String) = connection().shell(command)
-    override fun openShell(command: String) = connection().openShell(command)
-    override fun install(file: File) = connection().install(file)
-    override fun uninstall(packageName: String) = connection().uninstall(packageName)
-    override fun abbExec(vararg command: String) = connection().abbExec(*command)
-    override fun root() = connection().root()
-    override fun unroot() = connection().unroot()
     override fun open(destination: String) = connection().open(destination)
+
     override fun close() {
         connection?.first?.close()
     }

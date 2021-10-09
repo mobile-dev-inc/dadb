@@ -18,43 +18,132 @@
 package dadb
 
 import com.google.common.truth.Truth
-import org.junit.After
+import org.junit.Before
+import java.net.Socket
+import kotlin.random.Random
 import kotlin.test.Ignore
 import kotlin.test.Test
 
-internal class DadbTest {
+internal class DadbTest : BaseConcurrencyTest() {
 
-    private val dadb = Dadb.create("localhost", 5555) as DadbImpl
-
-    @After
-    fun tearDown() {
-        dadb.close()
+    @Before
+    fun setUp() {
+        killServer()
     }
 
     @Test
-    fun reconnection() {
-        assertShellResponse(dadb.shell("echo hello1"), 0, "hello1\n")
+    fun basic() {
+        localEmulator { dadb ->
+            dadb.open("shell,raw:echo hello").use { stream ->
+                val response = stream.source.readString(Charsets.UTF_8)
+                Truth.assertThat(response).isEqualTo("hello\n")
+            }
+        }
+    }
 
-        dadb.closeConnection()
+    @Test
+    fun openShell_read() {
+        localEmulator { dadb ->
+            dadb.openShell("echo hello").use { shellStream ->
+                val shellResponse = shellStream.readAll()
+                assertShellResponse(shellResponse, 0, "hello\n")
+            }
+        }
+    }
 
-        assertShellResponse(dadb.shell("echo hello2"), 0, "hello2\n")
+    @Test
+    fun openShell_write() {
+        localEmulator { dadb ->
+            dadb.openShell().use { shellStream ->
+                shellStream.write("echo hello\n")
+
+                val shellPacket = shellStream.read()
+                assertShellPacket(shellPacket, ID_STDOUT, "hello\n")
+
+                shellStream.write("exit\n")
+
+                val shellResponse = shellStream.readAll()
+                assertShellResponse(shellResponse, 0, "")
+            }
+        }
+    }
+
+    @Test
+    fun openShell_concurrency() {
+        localEmulator { dadb ->
+            launch(20) {
+                val random = Random.nextDouble()
+                dadb.openShell().use { shellStream ->
+                    shellStream.write("echo $random\n")
+
+                    val shellPacket = shellStream.read()
+                    assertShellPacket(shellPacket, ID_STDOUT, "$random\n")
+
+                    shellStream.write("exit\n")
+
+                    val shellResponse = shellStream.readAll()
+                    assertShellResponse(shellResponse, 0, "")
+                }
+            }
+            waitForAll()
+        }
+    }
+
+    @Test
+    fun install() {
+        localEmulator { dadb ->
+            dadb.install(TestApk.FILE)
+            val response = dadb.shell("pm list packages ${TestApk.PACKAGE_NAME}")
+            assertShellResponse(response, 0, "package:${TestApk.PACKAGE_NAME}\n")
+        }
+    }
+
+    @Test
+    fun uninstall() {
+        localEmulator { dadb ->
+            dadb.install(TestApk.FILE)
+            dadb.uninstall(TestApk.PACKAGE_NAME)
+            val response = dadb.shell("pm list packages ${TestApk.PACKAGE_NAME}")
+            assertShellResponse(response, 0, "")
+        }
     }
 
     @Ignore
     @Test
     fun root() {
-        dadb.root()
-        dadb.unroot()
+        localEmulator(Dadb::unroot)
+        localEmulator(Dadb::root)
+        localEmulator { dadb ->
+            val response = dadb.shell("getprop service.adb.root")
+            assertShellResponse(response, 0, "1\n")
+        }
     }
 
+    @Ignore
     @Test
-    fun discover() {
-        val dadb = Dadb.discover("localhost") ?: fail("Failed to discover emulator")
-        assertShellResponse(dadb.shell("echo hello"), 0, "hello\n")
+    fun unroot() {
+        localEmulator(Dadb::root)
+        localEmulator(Dadb::unroot)
+        localEmulator { dadb ->
+            val response = dadb.shell("getprop service.adb.root")
+            assertShellResponse(response, 0, "0\n")
+        }
     }
 
-    private fun fail(message: String): Nothing {
-        Truth.assertWithMessage(message).fail()
-        throw RuntimeException()
+    private fun localEmulator(body: (dadb: Dadb) -> Unit) {
+        val socket = Socket("localhost", 5555)
+        val keyPair = AdbKeyPair.readDefault()
+        val connection = AdbConnection.connect(socket, keyPair)
+        TestDadb(connection).use(body)
+        connection.ensureEmpty()
     }
+}
+
+private class TestDadb(
+        private val connection: AdbConnection
+) : Dadb {
+
+    override fun open(destination: String) = connection.open(destination)
+
+    override fun close() = connection.close()
 }
