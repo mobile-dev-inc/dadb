@@ -32,6 +32,20 @@ val dadb = Dadb.discover("localhost")
 if (dadb == null) throw RuntimeException("No adb device found")
 ```
 
+## Install / Uninstall APK
+
+```kotlin
+dadb.install(exampleApkFile)
+dadb.uninstall("com.example.app")
+```
+
+## Push / Pull Files
+
+```kotlin
+dadb.push(srcFile, "/data/local/tmp/dst.txt")
+dadb.pull(dstFile, "/data/local/tmp/src.txt")
+```
+
 ## Execute Shell Command
 
 ```kotlin
