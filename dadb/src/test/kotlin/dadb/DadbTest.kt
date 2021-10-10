@@ -83,7 +83,7 @@ internal class DadbTest : BaseConcurrencyTest() {
     fun openShell_concurrency() {
         localEmulator { dadb ->
             launch(20) {
-                val random = Random().nextDouble()
+                val random = randomString()
                 dadb.openShell().use { shellStream ->
                     shellStream.write("echo $random\n")
 
@@ -101,9 +101,9 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
-    fun adbPushPull() {
+    fun adbPush_basic() {
         localEmulator { dadb ->
-            val content = "content"
+            val content = randomString()
             val remotePath = "/data/local/tmp/hello"
 
             val source = ByteArrayInputStream(content.toByteArray()).source()
@@ -118,9 +118,29 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
-    fun adbPushPull_file() {
+    fun adbPush_directoryDoesNotExist() {
         localEmulator { dadb ->
-            val content = "content"
+            val content = randomString()
+            val remoteDir = "/data/local/tmp/nested"
+            val remotePath = "$remoteDir/hello"
+
+            dadb.shell("rm -rf $remoteDir")
+
+            val source = ByteArrayInputStream(content.toByteArray()).source()
+            dadb.push(source, remotePath, 439, System.currentTimeMillis())
+
+            val buffer = Buffer()
+            dadb.pull(buffer, remotePath)
+            val pulledContent = buffer.readString(StandardCharsets.UTF_8)
+
+            assertThat(pulledContent).isEqualTo(content)
+        }
+    }
+
+    @Test
+    fun adbPush_file() {
+        localEmulator { dadb ->
+            val content = randomString()
             val remotePath = "/data/local/tmp/hello"
             val localSrcFile = temporaryFolder.newFile().apply { writeText(content) }
 
@@ -180,6 +200,10 @@ internal class DadbTest : BaseConcurrencyTest() {
         val connection = AdbConnection.connect(socket, keyPair)
         TestDadb(connection).use(body)
         connection.ensureEmpty()
+    }
+
+    private fun randomString(): String {
+        return "${Random().nextDouble()}"
     }
 }
 
