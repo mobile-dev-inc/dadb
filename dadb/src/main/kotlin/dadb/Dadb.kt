@@ -71,8 +71,8 @@ interface Dadb : AutoCloseable {
     }
 
     @Throws(IOException::class)
-    fun install(file: File) {
-        abbExec("package", "install", "-S", file.length().toString()).use { stream ->
+    fun install(file: File, vararg options: String) {
+        abbExec("package", "install", "-S", file.length().toString(), *options).use { stream ->
             stream.sink.writeAll(file.source())
             stream.sink.flush()
             val response = stream.source.readString(Charsets.UTF_8)

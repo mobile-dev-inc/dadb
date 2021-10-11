@@ -163,6 +163,21 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
+    internal fun install_grantPermissions() {
+        localEmulator { dadb ->
+            dadb.install(TestApk.FILE)
+            var response = dadb.shell("dumpsys package ${TestApk.PACKAGE_NAME}")
+            assertThat(response.exitCode).isEqualTo(0)
+            assertThat(response.output).doesNotContain("android.permission.RECORD_AUDIO: granted=true")
+
+            dadb.install(TestApk.FILE, "-g")
+            response = dadb.shell("dumpsys package ${TestApk.PACKAGE_NAME}")
+            assertThat(response.exitCode).isEqualTo(0)
+            assertThat(response.output).contains("android.permission.RECORD_AUDIO: granted=true")
+        }
+    }
+
+    @Test
     fun uninstall() {
         localEmulator { dadb ->
             dadb.install(TestApk.FILE)
