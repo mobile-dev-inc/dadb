@@ -2,7 +2,7 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/dev.mobile/dadb.svg)](https://mvnrepository.com/artifact/dev.mobile/dadb)
 
-A Kotlin/Java library to connect directly to an Android device without an adb binary or a running ADB server
+A Kotlin/Java library to connect directly to an Android device without an adb binary or an ADB server
 
 ```kotlin
 dependencies {
