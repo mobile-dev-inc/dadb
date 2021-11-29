@@ -2,6 +2,8 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/dev.mobile/dadb.svg)](https://mvnrepository.com/artifact/dev.mobile/dadb)
 
+[Blog Post: Our First Open-Source Project](https://blog.mobile.dev/our-first-open-source-project-54cd8edc452f)
+
 <img src="https://user-images.githubusercontent.com/847683/143626125-5872bdd8-180e-48bb-a64f-47b3688a086d.png" width="700px" />
 
 A Kotlin/Java library to connect directly to an Android device without an adb binary or an ADB server
