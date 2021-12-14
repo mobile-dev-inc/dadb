@@ -57,6 +57,17 @@ assert(response.exitCode == 0)
 assert(response.output == "hello\n")
 ```
 
+### Authentication
+
+**Dadb will use your adb key at `~/.android/adbkey` by default.**
+
+If you need to specify a custom path to your adb key, use the optional `keyPair` argument:
+
+```kotlin
+val adbKeyPair = AdbKeyPair.create(privateKeyFile, publicKeyFile)
+Dadb.create("localhost", 5555, adbKeyPair)
+```
+
 # License
 
 ```

@@ -120,10 +120,12 @@ interface Dadb : AutoCloseable {
         private const val MAX_EMULATOR_PORT = 5683
 
         @JvmStatic
-        fun create(host: String, port: Int, keyPair: AdbKeyPair? = null): Dadb = DadbImpl(host, port, keyPair)
+        @JvmOverloads
+        fun create(host: String, port: Int, keyPair: AdbKeyPair? = AdbKeyPair.readDefault()): Dadb = DadbImpl(host, port, keyPair)
 
         @JvmStatic
-        fun discover(host: String, keyPair: AdbKeyPair? = null): Dadb? {
+        @JvmOverloads
+        fun discover(host: String, keyPair: AdbKeyPair? = AdbKeyPair.readDefault()): Dadb? {
             (MIN_EMULATOR_PORT .. MAX_EMULATOR_PORT).forEach { port ->
                 val dadb = create(host, port, keyPair)
                 try {
