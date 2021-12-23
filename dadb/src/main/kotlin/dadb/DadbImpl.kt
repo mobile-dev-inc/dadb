@@ -30,6 +30,10 @@ internal class DadbImpl(
 
     override fun open(destination: String) = connection().open(destination)
 
+    override fun supportsFeature(feature: String): Boolean {
+        return connection().supportsFeature(feature)
+    }
+
     override fun close() {
         connection?.first?.close()
     }

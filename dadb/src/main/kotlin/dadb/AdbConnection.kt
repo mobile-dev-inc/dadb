@@ -31,7 +31,7 @@ internal class AdbConnection internal constructor(
         adbReader: AdbReader,
         private val adbWriter: AdbWriter,
         private val closeable: Closeable?,
-        private val connectionString: String,
+        private val supportedFeatures: Set<String>,
         private val version: Int,
         private val maxPayloadSize: Int
 ) : AutoCloseable {
@@ -52,6 +52,11 @@ internal class AdbConnection internal constructor(
             messageQueue.stopListening(localId)
             throw e
         }
+    }
+
+    @Throws(IOException::class)
+    fun supportsFeature(feature: String): Boolean {
+        return supportedFeatures.contains(feature)
     }
 
     private fun newId(): Int {
@@ -113,11 +118,25 @@ internal class AdbConnection internal constructor(
 
             if (message.command != Constants.CMD_CNXN) throw IOException("Connection failed: $message")
 
-            val connectionString = String(message.payload)
+            val connectionString = parseConnectionString(String(message.payload))
             val version = message.arg0
             val maxPayloadSize = message.arg1
 
-            return AdbConnection(adbReader, adbWriter, closeable, connectionString, version, maxPayloadSize)
+            return AdbConnection(adbReader, adbWriter, closeable, connectionString.features, version, maxPayloadSize)
+        }
+
+        // ie: "device::ro.product.name=sdk_gphone_x86;ro.product.model=Android SDK built for x86;ro.product.device=generic_x86;features=fixed_push_symlink_timestamp,apex,fixed_push_mkdir,stat_v2,abb_exec,cmd,abb,shell_v2"
+        private fun parseConnectionString(connectionString: String): ConnectionString {
+            val keyValues = connectionString.substringAfter("device::")
+                    .split(";")
+                    .map { it.split("=") }
+                    .mapNotNull { if (it.size != 2) null else it[0] to it[1] }
+                    .toMap()
+            if ("features" !in keyValues) throw IOException("Failed to parse features from connection string: $connectionString")
+            val features = keyValues.getValue("features").split(",").toSet()
+            return ConnectionString(features)
         }
     }
 }
+
+private data class ConnectionString(val features: Set<String>)

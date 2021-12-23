@@ -28,6 +28,9 @@ interface Dadb : AutoCloseable {
     fun open(destination: String): AdbStream
 
     @Throws(IOException::class)
+    fun supportsFeature(feature: String): Boolean
+
+    @Throws(IOException::class)
     fun shell(command: String): AdbShellResponse {
         openShell(command).use { stream ->
             return stream.readAll()
