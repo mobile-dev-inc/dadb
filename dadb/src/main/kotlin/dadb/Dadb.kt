@@ -75,13 +75,20 @@ interface Dadb : AutoCloseable {
 
     @Throws(IOException::class)
     fun install(file: File, vararg options: String) {
-        abbExec("package", "install", "-S", file.length().toString(), *options).use { stream ->
-            stream.sink.writeAll(file.source())
-            stream.sink.flush()
-            val response = stream.source.readString(Charsets.UTF_8)
-            if (!response.startsWith("Success")) {
-                throw IOException("Install failed: $response")
+        if (supportsFeature("abb_exec")) {
+            abbExec("package", "install", "-S", file.length().toString(), *options).use { stream ->
+                stream.sink.writeAll(file.source())
+                stream.sink.flush()
+                val response = stream.source.readString(Charsets.UTF_8)
+                if (!response.startsWith("Success")) {
+                    throw IOException("Install failed: $response")
+                }
             }
+        } else {
+            val fileName = file.name
+            val remotePath = "/data/local/tmp/$fileName"
+            push(file, remotePath)
+            shell("pm install ${options.joinToString(" ")} \"$remotePath\"")
         }
     }
 
@@ -95,6 +102,7 @@ interface Dadb : AutoCloseable {
 
     @Throws(IOException::class)
     fun abbExec(vararg command: String): AdbStream {
+        if (!supportsFeature("abb_exec")) throw UnsupportedOperationException("abb_exec is not supported on this version of Android")
         val destination = "abb_exec:${command.joinToString("\u0000")}"
         return open(destination)
     }
