@@ -54,7 +54,6 @@ internal class AdbConnection internal constructor(
         }
     }
 
-    @Throws(IOException::class)
     fun supportsFeature(feature: String): Boolean {
         return supportedFeatures.contains(feature)
     }
