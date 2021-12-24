@@ -228,5 +228,7 @@ private class TestDadb(
 
     override fun open(destination: String) = connection.open(destination)
 
+    override fun supportsFeature(feature: String) = connection.supportsFeature(feature)
+
     override fun close() = connection.close()
 }
