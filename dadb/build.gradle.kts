@@ -18,10 +18,11 @@ repositories {
 }
 
 dependencies {
-    api("com.squareup.okio:okio:2.10.0")
+    api("com.squareup.okio:okio:3.0.0")
     implementation(platform("org.jetbrains.kotlin:kotlin-bom"))
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 
+    testImplementation("com.squareup.okio:okio-fakefilesystem:3.0.0")
     testImplementation("org.jetbrains.kotlin:kotlin-test")
     testImplementation("com.google.truth:truth:1.0.1")
 }

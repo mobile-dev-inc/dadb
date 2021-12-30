@@ -17,6 +17,7 @@ allprojects {
         kotlinOptions {
             jvmTarget = "1.8"
             freeCompilerArgs += "-Xopt-in=kotlin.ExperimentalUnsignedTypes"
+            freeCompilerArgs += "-Xjvm-default=all"
         }
     }
     pluginManager.withPlugin("com.vanniktech.maven.publish") {
