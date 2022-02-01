@@ -1,6 +1,10 @@
 # Changelog
 
-### 0.0.9-SNAPSHOT
+### 0.0.10-SNAPSHOT
+
+### 0.0.9
+
+* Fix `Dadb.pull` for large files
 
 ### 0.0.8
 
