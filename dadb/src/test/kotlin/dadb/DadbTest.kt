@@ -138,6 +138,22 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
+    fun adbPull_largeFile() {
+        localEmulator { dadb ->
+            val remotePath = "/data/local/tmp/hello"
+            val sizeMb = 100
+
+            dadb.shell("fallocate -l ${sizeMb}M $remotePath")
+
+            val buffer = Buffer()
+            dadb.pull(buffer, remotePath)
+            val pulledContent = buffer.readByteArray()
+
+            assertThat(pulledContent).hasLength(sizeMb * 1024 * 1024)
+        }
+    }
+
+    @Test
     fun adbPush_file() {
         localEmulator { dadb ->
             val content = randomString()
