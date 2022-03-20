@@ -11,8 +11,8 @@ env:
 
 jobs:
   publish:
-
     runs-on: ubuntu-latest
+    if: github.repository == 'mobile-dev-inc/dadb'
 
     steps:
       - name: Checkout
