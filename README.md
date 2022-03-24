@@ -57,6 +57,18 @@ assert(response.exitCode == 0)
 assert(response.output == "hello\n")
 ```
 
+### TCP Forwarding
+
+```kotlin
+dadb.tcpForward(
+    hostPort = 7001,
+    targetPort = 7001
+).use {
+    // localhost:7001 is now forwarded to device's 7001 port
+    // Do operations that depend on port forwarding
+}
+```
+
 ### Authentication
 
 **Dadb will use your adb key at `~/.android/adbkey` by default.**
