@@ -6,8 +6,10 @@ import okio.Source
 import okio.buffer
 import okio.sink
 import okio.source
+import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.ServerSocket
+import java.util.concurrent.TimeoutException
 import kotlin.concurrent.thread
 
 internal class TcpForwarder(
@@ -20,9 +22,7 @@ internal class TcpForwarder(
     private var thread: Thread? = null
 
     fun start() {
-        if (state != State.STOPPED) {
-            throw IllegalStateException("Forwarder is already started at port $hostPort")
-        }
+        check(state == State.STOPPED) { "Forwarder is already started at port $hostPort" }
 
         moveToState(State.STARTING)
         thread = thread {
@@ -34,7 +34,7 @@ internal class TcpForwarder(
         }
 
         waitFor(10, 5000) {
-            state == State.STARTED
+            state == State.STARTED || state == State.STOPPED
         }
     }
 
@@ -90,8 +90,12 @@ internal class TcpForwarder(
     private fun forward(source: Source, sink: BufferedSink) {
         try {
             while (!Thread.interrupted()) {
-                source.read(sink.buffer, 256)
-                sink.flush()
+                try {
+                    source.read(sink.buffer, 256)
+                    sink.flush()
+                } catch (ignored: IOException) {
+                    // Do nothing
+                }
             }
         } catch (ignored: InterruptedException) {
             // Do nothing
@@ -111,7 +115,7 @@ internal class TcpForwarder(
         STOPPED
     }
 
-    private fun waitFor(intervalMs: Int, timeoutMs: Int, test: () -> Boolean): Boolean {
+    private fun waitFor(intervalMs: Int, timeoutMs: Int, test: () -> Boolean) {
         val start = System.currentTimeMillis()
         var lastCheck = start
         while (!test()) {
@@ -119,7 +123,7 @@ internal class TcpForwarder(
             val timeSinceStart = now - start
             val timeSinceLastCheck = now - lastCheck
             if (timeoutMs in 0..timeSinceStart) {
-                return false
+                throw TimeoutException()
             }
             val sleepTime = intervalMs - timeSinceLastCheck
             if (sleepTime > 0) {
@@ -127,7 +131,6 @@ internal class TcpForwarder(
             }
             lastCheck = System.currentTimeMillis()
         }
-        return true
     }
 
 }
