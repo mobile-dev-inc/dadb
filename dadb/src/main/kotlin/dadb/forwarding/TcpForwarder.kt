@@ -9,6 +9,8 @@ import okio.source
 import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.ServerSocket
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeoutException
 import kotlin.concurrent.thread
 
@@ -19,13 +21,17 @@ internal class TcpForwarder(
 ) : AutoCloseable {
 
     private var state: State = State.STOPPED
-    private var thread: Thread? = null
+    private var serverThread: Thread? = null
+    private var server: ServerSocket? = null
+    private var clientExecutor: ExecutorService? = null
 
     fun start() {
         check(state == State.STOPPED) { "Forwarder is already started at port $hostPort" }
 
         moveToState(State.STARTING)
-        thread = thread {
+
+        clientExecutor = Executors.newCachedThreadPool()
+        serverThread = thread {
             try {
                 handleForwarding()
             } finally {
@@ -34,43 +40,42 @@ internal class TcpForwarder(
         }
 
         waitFor(10, 5000) {
-            state == State.STARTED || state == State.STOPPED
+            state == State.STARTED
         }
     }
 
     private fun handleForwarding() {
-        val adbStream = dadb.open("tcp:$targetPort")
-
-        val server = ServerSocket(hostPort)
+        val serverRef = ServerSocket(hostPort)
+        server = serverRef
 
         moveToState(State.STARTED)
 
-        val client = server.accept()
-
-        val readerThread = thread {
-            forward(
-                client.getInputStream().source(),
-                adbStream.sink
-            )
-        }
-
-        val writerThread = thread {
-            forward(
-                adbStream.source,
-                client.sink().buffer()
-            )
-        }
-
         while (!Thread.interrupted()) {
-            try {
-                Thread.sleep(500)
-            } catch (ignored: InterruptedException) {
-                break
+            val client = serverRef.accept()
+
+            clientExecutor?.execute {
+                val adbStream = dadb.open("tcp:$targetPort")
+
+                val readerThread = thread {
+                    forward(
+                        client.getInputStream().source(),
+                        adbStream.sink
+                    )
+                }
+
+                try {
+                    forward(
+                        adbStream.source,
+                        client.sink().buffer()
+                    )
+                } finally {
+                    adbStream.close()
+                    client.close()
+
+                    readerThread.interrupt()
+                }
             }
         }
-
-        readerThread.interrupt()
-        writerThread.interrupt()
     }
 
     override fun close() {
@@ -78,9 +83,20 @@ internal class TcpForwarder(
             return
         }
 
+        // Make sure that we are not stopping the server while it is in a transient state
+        // to avoid surprises
+        waitFor(10, 5000) {
+            state == State.STARTED
+        }
+
         moveToState(State.STOPPING)
-        thread?.interrupt()
-        thread = null
+
+        server?.close()
+        server = null
+        clientExecutor?.shutdown()
+        clientExecutor = null
+        serverThread?.interrupt()
+        serverThread = null
 
         waitFor(10, 5000) {
             state == State.STOPPED
@@ -91,8 +107,11 @@ internal class TcpForwarder(
         try {
             while (!Thread.interrupted()) {
                 try {
-                    source.read(sink.buffer, 256)
-                    sink.flush()
+                    if (source.read(sink.buffer, 256) >= 0) {
+                        sink.flush()
+                    } else {
+                        return
+                    }
                 } catch (ignored: IOException) {
                     // Do nothing
                 }

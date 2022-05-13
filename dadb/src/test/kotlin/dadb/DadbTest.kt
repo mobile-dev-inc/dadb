@@ -19,13 +19,18 @@ package dadb
 
 import com.google.common.truth.Truth.assertThat
 import okio.Buffer
+import okio.buffer
 import okio.source
 import org.junit.Rule
 import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
 import java.net.Socket
 import java.nio.charset.StandardCharsets
-import java.util.*
+import java.util.Random
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 import kotlin.test.BeforeTest
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -36,10 +41,12 @@ internal class DadbTest : BaseConcurrencyTest() {
     @Rule
     val temporaryFolder = TemporaryFolder()
 
+    val executor = Executors.newCachedThreadPool()
+
     @BeforeTest
     fun setUp() {
         temporaryFolder.create()
-        killServer()
+//        killServer()
     }
 
     @Test
@@ -203,6 +210,34 @@ internal class DadbTest : BaseConcurrencyTest() {
         }
     }
 
+    @Test
+    fun tcpForward_singleConnection() {
+        localEmulator { dadb ->
+            dadb.tcpForward(8888, 8888).use { _ ->
+                broadcastSingleMessage(dadb, "OK", 8888)
+                val result = readSocket("localhost", 8888)
+
+                assertThat(result).isEqualTo("OK\n")
+            }
+        }
+    }
+
+    @Test
+    fun tcpForward_multipleConsequentConnections() {
+        localEmulator { dadb ->
+            dadb.tcpForward(8888, 8888).use { _ ->
+                broadcastSingleMessage(dadb, "OK", 8888)
+                val first = readSocket("localhost", 8888)
+
+                broadcastSingleMessage(dadb, "OK", 8888)
+                val second = readSocket("localhost", 8888)
+
+                assertThat(first).isEqualTo("OK\n")
+                assertThat(second).isEqualTo("OK\n")
+            }
+        }
+    }
+
     @Ignore
     @Test
     fun root() {
@@ -233,13 +268,38 @@ internal class DadbTest : BaseConcurrencyTest() {
         connection.ensureEmpty()
     }
 
+    private fun readSocketAsync(host: String, port: Int): Future<String> {
+        return executor
+            .submit(Callable {
+                Socket(host, port).use { socket ->
+                    println("[Client] Starting to read")
+                    println("[Client] Is connected: ${socket.isConnected}")
+                    socket.source()
+                        .buffer()
+                        .readUtf8()
+                }
+            })
+    }
+
+    private fun readSocket(host: String, port: Int): String {
+        return readSocketAsync(host, port)
+            .get(5, TimeUnit.SECONDS)
+    }
+
+    private fun broadcastSingleMessage(dadb: Dadb, message: String, port: Int) {
+        executor.execute {
+            dadb.shell("echo -e '$message' | nc -lp $port")
+        }
+        Thread.sleep(100)
+    }
+
     private fun randomString(): String {
         return "${Random().nextDouble()}"
     }
 }
 
 private class TestDadb(
-        private val connection: AdbConnection
+    private val connection: AdbConnection,
 ) : Dadb {
 
     override fun open(destination: String) = connection.open(destination)
