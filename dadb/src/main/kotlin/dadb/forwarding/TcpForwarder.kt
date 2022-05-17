@@ -9,8 +9,10 @@ import okio.source
 import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.ServerSocket
+import java.net.SocketException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.concurrent.thread
 
@@ -34,6 +36,8 @@ internal class TcpForwarder(
         serverThread = thread {
             try {
                 handleForwarding()
+            } catch (ignored: SocketException) {
+                // Do nothing
             } finally {
                 moveToState(State.STOPPED)
             }
@@ -91,12 +95,13 @@ internal class TcpForwarder(
 
         moveToState(State.STOPPING)
 
-        server?.close()
-        server = null
         clientExecutor?.shutdown()
+        clientExecutor?.awaitTermination(5, TimeUnit.SECONDS)
         clientExecutor = null
         serverThread?.interrupt()
         serverThread = null
+        server?.close()
+        server = null
 
         waitFor(10, 5000) {
             state == State.STOPPED

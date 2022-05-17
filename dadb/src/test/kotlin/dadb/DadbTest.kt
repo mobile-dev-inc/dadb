@@ -214,8 +214,10 @@ internal class DadbTest : BaseConcurrencyTest() {
     fun tcpForward_singleConnection() {
         localEmulator { dadb ->
             dadb.tcpForward(8888, 8888).use { _ ->
-                broadcastSingleMessage(dadb, "OK", 8888)
+                val future = broadcastSingleMessage(dadb, "OK", 8888)
                 val result = readSocket("localhost", 8888)
+
+                future.get(1, TimeUnit.SECONDS)
 
                 assertThat(result).isEqualTo("OK\n")
             }
@@ -226,11 +228,14 @@ internal class DadbTest : BaseConcurrencyTest() {
     fun tcpForward_multipleConsequentConnections() {
         localEmulator { dadb ->
             dadb.tcpForward(8888, 8888).use { _ ->
-                broadcastSingleMessage(dadb, "OK", 8888)
+                val firstFuture = broadcastSingleMessage(dadb, "OK", 8888)
                 val first = readSocket("localhost", 8888)
 
-                broadcastSingleMessage(dadb, "OK", 8888)
+                val secondFuture = broadcastSingleMessage(dadb, "OK", 8888)
                 val second = readSocket("localhost", 8888)
+
+                firstFuture.get(1, TimeUnit.SECONDS)
+                secondFuture.get(1, TimeUnit.SECONDS)
 
                 assertThat(first).isEqualTo("OK\n")
                 assertThat(second).isEqualTo("OK\n")
@@ -272,8 +277,6 @@ internal class DadbTest : BaseConcurrencyTest() {
         return executor
             .submit(Callable {
                 Socket(host, port).use { socket ->
-                    println("[Client] Starting to read")
-                    println("[Client] Is connected: ${socket.isConnected}")
                     socket.source()
                         .buffer()
                         .readUtf8()
@@ -286,11 +289,13 @@ internal class DadbTest : BaseConcurrencyTest() {
             .get(5, TimeUnit.SECONDS)
     }
 
-    private fun broadcastSingleMessage(dadb: Dadb, message: String, port: Int) {
-        executor.execute {
+    private fun broadcastSingleMessage(dadb: Dadb, message: String, port: Int): Future<*> {
+        val future = executor.submit {
             dadb.shell("echo -e '$message' | nc -lp $port")
         }
         Thread.sleep(100)
+
+        return future
     }
 
     private fun randomString(): String {
