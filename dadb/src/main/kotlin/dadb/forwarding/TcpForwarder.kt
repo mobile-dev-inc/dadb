@@ -95,13 +95,13 @@ internal class TcpForwarder(
 
         moveToState(State.STOPPING)
 
+        server?.close()
+        server = null
+        serverThread?.interrupt()
+        serverThread = null
         clientExecutor?.shutdown()
         clientExecutor?.awaitTermination(5, TimeUnit.SECONDS)
         clientExecutor = null
-        serverThread?.interrupt()
-        serverThread = null
-        server?.close()
-        server = null
 
         waitFor(10, 5000) {
             state == State.STOPPED
