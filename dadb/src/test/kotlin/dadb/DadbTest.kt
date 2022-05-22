@@ -225,7 +225,7 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
-    fun tcpForward_multipleConsequentConnections() {
+    fun tcpForward_multipleSequentialConnections() {
         localEmulator { dadb ->
             dadb.tcpForward(8888, 8888).use { _ ->
                 val firstFuture = broadcastSingleMessage(dadb, "OK", 8888)
