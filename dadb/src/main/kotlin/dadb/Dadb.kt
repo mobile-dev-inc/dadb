@@ -17,6 +17,7 @@
 
 package dadb
 
+import dadb.forwarding.TcpForwarder
 import okio.*
 import java.io.File
 import java.io.IOException
@@ -122,6 +123,14 @@ interface Dadb : AutoCloseable {
             throw IOException("Failed to restart adb as root: $response")
         }
         waitRootOrClose(this, root = false)
+    }
+
+    @Throws(InterruptedException::class)
+    fun tcpForward(hostPort: Int, targetPort: Int): AutoCloseable {
+        val forwarder = TcpForwarder(this, hostPort, targetPort)
+        forwarder.start()
+
+        return forwarder
     }
 
     companion object {
