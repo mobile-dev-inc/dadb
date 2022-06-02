@@ -1,6 +1,10 @@
 # Changelog
 
-### 0.0.10-SNAPSHOT
+### 0.0.11-SNAPSHOT
+
+### 0.0.10
+
+* Add support for TCP port forwarding
 
 ### 0.0.9
 
