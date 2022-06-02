@@ -13,7 +13,7 @@ After merging the PR, tag the release:
 
 After this is done, create a new branch to prepare for the next development version:
 
-7. `git checkout -b X.Y.Z-SNAPSHOT` (where X.Y.Z is the new development version)
+7. `git checkout master && git pull && git checkout -b X.Y.Z-SNAPSHOT` (where X.Y.Z is the new development version)
 8. Update the `gradle.properties` to the next SNAPSHOT version.
 9. `git commit -am "Prepare next development version."`
 10. Raise and merge the PR
