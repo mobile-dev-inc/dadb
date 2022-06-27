@@ -40,7 +40,7 @@ internal class TcpForwarder(
             } catch (ignored: SocketException) {
                 // Do nothing
             } catch (e: IOException) {
-                log { e.message ?: "could not start TCP port forwarding" }
+                log { "could not start TCP port forwarding: ${e.message}" }
             } finally {
                 moveToState(State.STOPPED)
             }
