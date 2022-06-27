@@ -38,6 +38,8 @@ internal class TcpForwarder(
                 handleForwarding()
             } catch (ignored: SocketException) {
                 // Do nothing
+            } catch (e: IOException) {
+                log { e.message ?: "could not start TCP port forwarding" }
             } finally {
                 moveToState(State.STOPPED)
             }
