@@ -1,6 +1,7 @@
 package dadb.forwarding
 
 import dadb.Dadb
+import dadb.log
 import okio.BufferedSink
 import okio.Source
 import okio.buffer
