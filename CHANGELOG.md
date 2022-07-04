@@ -2,6 +2,8 @@
 
 ### 0.0.11-SNAPSHOT
 
+* `Dadb.create` / `Dadb.create` / `Dadb.discover` / `AdbKey.readDefault()` will all generate a key if one is not found in the default location.
+
 ### 0.0.10
 
 * Add support for TCP port forwarding
