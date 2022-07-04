@@ -1,6 +1,7 @@
 package dadb.forwarding
 
 import dadb.Dadb
+import dadb.log
 import okio.BufferedSink
 import okio.Source
 import okio.buffer
@@ -38,6 +39,8 @@ internal class TcpForwarder(
                 handleForwarding()
             } catch (ignored: SocketException) {
                 // Do nothing
+            } catch (e: IOException) {
+                log { "could not start TCP port forwarding: ${e.message}" }
             } finally {
                 moveToState(State.STOPPED)
             }
