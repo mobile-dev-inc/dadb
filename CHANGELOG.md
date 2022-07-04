@@ -1,6 +1,8 @@
 # Changelog
 
-### 0.0.11-SNAPSHOT
+### 0.0.12-SNAPSHOT
+
+### 0.0.11
 
 * `Dadb.create` / `Dadb.create` / `Dadb.discover` / `AdbKey.readDefault()` will all generate a key if one is not found in the default location.
 
