@@ -76,7 +76,7 @@ internal class DadbTest : BaseConcurrencyTest() {
                 shellStream.write("echo hello\n")
 
                 val shellPacket = shellStream.read()
-                assertShellPacket(shellPacket, ID_STDOUT, "hello\n")
+                assertShellPacket(shellPacket, AdbShellPacket.StdOut::class.java, "hello\n")
 
                 shellStream.write("exit\n")
 
@@ -95,7 +95,7 @@ internal class DadbTest : BaseConcurrencyTest() {
                     shellStream.write("echo $random\n")
 
                     val shellPacket = shellStream.read()
-                    assertShellPacket(shellPacket, ID_STDOUT, "$random\n")
+                    assertShellPacket(shellPacket, AdbShellPacket.StdOut::class.java, "$random\n")
 
                     shellStream.write("exit\n")
 

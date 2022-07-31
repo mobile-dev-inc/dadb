@@ -27,9 +27,9 @@ fun assertShellResponse(shellResponse: AdbShellResponse, exitCode: Int, allOutpu
     Truth.assertThat(shellResponse.exitCode).isEqualTo(exitCode)
 }
 
-fun assertShellPacket(shellPacket: AdbShellPacket, id: Int, payload: String) {
+fun assertShellPacket(shellPacket: AdbShellPacket, packetType: Class<out AdbShellPacket>, payload: String) {
     Truth.assertThat(String(shellPacket.payload)).isEqualTo(payload)
-    Truth.assertThat(shellPacket.id).isEqualTo(id)
+    Truth.assertThat(shellPacket).isInstanceOf(packetType)
 }
 
 fun killServer() {
