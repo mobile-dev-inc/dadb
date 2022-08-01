@@ -1,6 +1,10 @@
 # Changelog
 
-### 0.0.12-SNAPSHOT
+### 0.0.13-SNAPSHOT
+
+### 0.0.12
+
+* Make `AdbShellPacket` a sealed class
 
 ### 0.0.11
 
