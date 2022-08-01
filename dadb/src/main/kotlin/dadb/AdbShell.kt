@@ -19,6 +19,9 @@
 
 package dadb
 
+import dadb.AdbShellPacket.Exit
+import dadb.AdbShellPacket.StdError
+import dadb.AdbShellPacket.StdOut
 import java.io.IOException
 
 const val ID_STDIN = 0
@@ -36,16 +39,19 @@ class AdbShellStream(
         val output = StringBuilder()
         val errorOutput = StringBuilder()
         while (true) {
-            val packet = read()
-            val id = packet.id
-            if (id == ID_EXIT) {
-                val exitCode = packet.payload[0].toInt()
-                return AdbShellResponse(output.toString(), errorOutput.toString(), exitCode)
-            } else if (id == ID_STDOUT || id == ID_STDERR) {
-                val sb = if (id == ID_STDOUT) output else errorOutput
-                sb.append(String(packet.payload))
-            } else {
-                throw IllegalStateException("Invalid shell packet id: $id")
+            when (val packet = read()) {
+                is Exit -> {
+                    val exitCode = packet.payload[0].toInt()
+                    return AdbShellResponse(output.toString(), errorOutput.toString(), exitCode)
+                }
+
+                is StdOut -> {
+                    output.append(String(packet.payload))
+                }
+
+                is StdError -> {
+                    errorOutput.append(String(packet.payload))
+                }
             }
         }
     }
@@ -56,7 +62,12 @@ class AdbShellStream(
             val id = checkId(readByte().toInt())
             val length = checkLength(id, readIntLe())
             val payload = readByteArray(length.toLong())
-            return AdbShellPacket(id, payload)
+            return when (id) {
+                ID_STDOUT -> StdOut(payload)
+                ID_STDERR -> StdError(payload)
+                ID_EXIT -> Exit(payload)
+                else -> throw IllegalArgumentException("Invalid shell packet id: $id")
+            }
         }
     }
 
@@ -93,27 +104,23 @@ class AdbShellStream(
     }
 }
 
-class AdbShellPacket(
-        val id: Int,
-        val payload: ByteArray
+sealed class AdbShellPacket(
+        open val payload: ByteArray
 ) {
+    abstract val id: Int
+    class StdOut(override val payload: ByteArray) : AdbShellPacket(payload) {
+        override val id: Int = ID_STDOUT
+        override fun toString() = "STDOUT: ${String(payload)}"
+    }
 
-    override fun toString() = "${idStr(id)}: ${payloadStr(id, payload)}"
+    class StdError(override val payload: ByteArray) : AdbShellPacket(payload) {
+        override val id: Int = ID_STDERR
+        override fun toString() = "STDERR: ${String(payload)}"
+    }
 
-    companion object {
-
-        private fun idStr(id: Int) = when(id) {
-            ID_STDOUT -> "STDOUT"
-            ID_STDERR -> "STDERR"
-            ID_EXIT -> "EXIT"
-            else -> throw IllegalArgumentException("Invalid shell packet id: $id")
-        }
-
-        private fun payloadStr(id: Int, payload: ByteArray) = if (id == ID_EXIT) {
-            "${payload[0]}"
-        } else {
-            String(payload)
-        }
+    class Exit(override val payload: ByteArray) : AdbShellPacket(payload) {
+        override val id: Int = ID_EXIT
+        override fun toString() = "EXIT: ${payload[0]}"
     }
 }
 
