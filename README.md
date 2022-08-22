@@ -50,7 +50,7 @@ if (dadb == null) throw RuntimeException("No adb device found")
     * Connect your device via USB, then run `adb tcpip 5555`
 2. Find you device's IP address. (See: [Step 6](https://developer.android.com/studio/command-line/adb#wireless))
 3. Connect to your device's IP address using dadb:
-    * eg: `Dadb.connect(10.0.0.192, 5555`
+    * eg: `Dadb.connect(10.0.0.192, 5555)`
 
 #### USB
 
