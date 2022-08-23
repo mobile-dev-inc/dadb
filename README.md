@@ -40,7 +40,7 @@ if (dadb == null) throw RuntimeException("No adb device found")
 #### Connect over Wi-Fi - Android 11+ (Wi-Fi Pairing)
 
 1. Pair your device over wifi using the standard `adb pair HOST:PORT CODE` command ([docs](https://developer.android.com/studio/command-line/adb#connect-to-a-device-over-wi-fi-android-11+)).
-    * eg: `adb pair 10.0.0.192:5555 123456`
+    * eg: `adb pair 10.0.0.192:45678 123456`
 2. Once your device is paired, dadb can connect to your device using your device's IP address (same as HOST above).
     * eg: `Dadb.connect(10.0.0.192, 5555)`.
 
