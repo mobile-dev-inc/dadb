@@ -41,14 +41,14 @@ if (dadb == null) throw RuntimeException("No adb device found")
 
 1. Pair your device over wifi using the standard `adb pair HOST:PORT CODE` command ([docs](https://developer.android.com/studio/command-line/adb#connect-to-a-device-over-wi-fi-android-11+)).
     * eg: `adb pair 10.0.0.192:45678 123456`
-2. Tell adbd to listen on tcp port 5555.
+2. Tell your device to listen for connections on tcp port 5555.
     * `adb tcpip 5555`
-4. Once your device is paired, and adbd is listening on port 5555, dadb can connect to your device using your device's IP address (same as HOST above).
+4. Once your device is listening for connections on port 5555, dadb can connect to your device using your device's IP address (same as HOST above).
     * eg: `Dadb.connect(10.0.0.192, 5555)`.
 
 #### Connect over Wi-Fi - Android 10 and below
 
-1. Configure adbd to listen on a port ([docs](https://developer.android.com/studio/command-line/adb#wireless)):
+1. Tell your device to listen for connections on tcp port 5555 ([docs](https://developer.android.com/studio/command-line/adb#wireless)):
     * Connect your device via USB, then run `adb tcpip 5555`
 2. Find you device's IP address. (See: [Step 6](https://developer.android.com/studio/command-line/adb#wireless))
 3. Connect to your device's IP address using dadb:
