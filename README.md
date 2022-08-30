@@ -43,7 +43,7 @@ if (dadb == null) throw RuntimeException("No adb device found")
     * eg: `adb pair 10.0.0.192:45678 123456`
 2. Tell adbd to listen on tcp port 5555.
     * `adb tcpip 5555`
-4. Once your device is paired, dadb can connect to your device using your device's IP address (same as HOST above).
+4. Once your device is paired, and adbd is listening on port 5555, dadb can connect to your device using your device's IP address (same as HOST above).
     * eg: `Dadb.connect(10.0.0.192, 5555)`.
 
 #### Connect over Wi-Fi - Android 10 and below
