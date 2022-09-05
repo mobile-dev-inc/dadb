@@ -73,7 +73,7 @@ class AdbKeyPair(
             val privateKeyFile = File(System.getenv("HOME"), ".android/adbkey")
             val publicKeyFile = File(System.getenv("HOME"), ".android/adbkey.pub")
 
-            if (!privateKeyFile.exists() || !publicKeyFile.exists()) {
+            if (!privateKeyFile.exists()) {
                 generate(privateKeyFile, publicKeyFile)
             }
 
@@ -83,7 +83,11 @@ class AdbKeyPair(
         @JvmStatic
         fun read(privateKeyFile: File, publicKeyFile: File): AdbKeyPair {
             val privateKey = PKCS8.parse(privateKeyFile.readBytes())
-            val publicKeyBytes = readAdbPublicKey(publicKeyFile)
+            val publicKeyBytes = if (publicKeyFile.exists()) {
+                readAdbPublicKey(publicKeyFile)
+            } else {
+                ByteArray(0)
+            }
 
             return AdbKeyPair(privateKey, publicKeyBytes)
         }
