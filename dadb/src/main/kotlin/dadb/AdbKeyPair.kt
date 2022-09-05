@@ -81,9 +81,10 @@ class AdbKeyPair(
         }
 
         @JvmStatic
-        fun read(privateKeyFile: File, publicKeyFile: File): AdbKeyPair {
+        @JvmOverloads
+        fun read(privateKeyFile: File, publicKeyFile: File? = null): AdbKeyPair {
             val privateKey = PKCS8.parse(privateKeyFile.readBytes())
-            val publicKeyBytes = if (publicKeyFile.exists()) {
+            val publicKeyBytes = if (publicKeyFile?.exists() == true) {
                 readAdbPublicKey(publicKeyFile)
             } else {
                 ByteArray(0)
