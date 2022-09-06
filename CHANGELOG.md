@@ -1,6 +1,9 @@
 # Changelog
 
-### 0.0.14-SHAPSHOT
+### 1.0.0
+
+* Fix: adbkey.pub is no longer required
+* Updating version to 1.0.0 to be semantically aligned with other mobile.dev libraries
 
 ### 0.0.13
 
