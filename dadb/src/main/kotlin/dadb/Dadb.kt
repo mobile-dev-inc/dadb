@@ -92,6 +92,55 @@ interface Dadb : AutoCloseable {
         }
     }
 
+    fun installMultiple(apks: List<File>, vararg options: String) {
+        // http://aospxref.com/android-12.0.0_r3/xref/packages/modules/adb/client/adb_install.cpp#538
+        if (supportsFeature("abb_exec")) {
+            val totalLength = apks.map { it.length() }.reduce { acc, l ->  acc + l }
+            abbExec("package", "install-create", "-S", totalLength.toString(), *options).use { createStream ->
+                val response = createStream.source.readString(Charsets.UTF_8)
+                if (!response.startsWith("Success")) {
+                    throw IOException("connect error for create: $response")
+                }
+                val pattern = """\[(\w+)]""".toRegex()
+                val sessionId = pattern.find(response)?.groups?.get(1)?.value ?: throw IOException("failed to create session")
+
+                var success = true
+                apks.forEach { apk->
+                    // install write every apk file to stream
+                    abbExec("package", "install-write", "-S", apk.length().toString(), sessionId, apk.name, "-", *options).use { writeStream->
+                        writeStream.sink.writeAll(apk.source())
+                        writeStream.sink.flush()
+
+                        val writeResponse = writeStream.source.readString(Charsets.UTF_8)
+                        if (!writeResponse.startsWith("Success")) {
+                            success = false
+                            return@forEach
+                        }
+                    }
+                }
+
+                // commit the session
+                val finalCommand = if (success) "install-commit" else "install-abandon"
+                abbExec("package", finalCommand, sessionId, *options).use { commitStream->
+                    val finalResponse = commitStream.source.readString(Charsets.UTF_8)
+                    if (!finalResponse.startsWith("Success")) {
+                        throw IOException("failed to finalize session: $commitStream")
+                    }
+                }
+            }
+        } else {
+            val fileNames = apks.map { it.name }
+            val remotePaths = fileNames.map { "/data/local/tmp/$it" }
+
+            apks.zip(remotePaths) { apk, path ->
+                push(apk, path)
+            }
+
+            val installPath = remotePaths.joinToString(" ")
+            shell("pm install ${options.joinToString(" ")} $installPath")
+        }
+    }
+
     @Throws(IOException::class)
     fun uninstall(packageName: String) {
         val response = shell("cmd package uninstall $packageName")
