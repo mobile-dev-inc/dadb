@@ -186,6 +186,15 @@ internal class DadbTest : BaseConcurrencyTest() {
     }
 
     @Test
+    fun installMultiple() {
+        localEmulator { dadb ->
+            dadb.installMultiple(TestApk.SPLIT_FILES)
+            val response = dadb.shell("pm list packages ${TestApk.SPLIT_PACKAGE_NAME}")
+            assertShellResponse(response, 0, "package:${TestApk.SPLIT_PACKAGE_NAME}\n")
+        }
+    }
+
+    @Test
     internal fun install_grantPermissions() {
         localEmulator { dadb ->
             dadb.install(TestApk.FILE)
