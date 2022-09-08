@@ -265,6 +265,16 @@ internal class DadbTest : BaseConcurrencyTest() {
         }
     }
 
+    @Test
+    fun unicode() {
+        localEmulator { dadb ->
+            dadb.openShell("echo bénéficiaire").use { shellStream ->
+                val shellResponse = shellStream.readAll()
+                assertShellResponse(shellResponse, 0, "bénéficiaire\n")
+            }
+        }
+    }
+
     private fun localEmulator(body: (dadb: Dadb) -> Unit) {
         val socket = Socket("localhost", 5555)
         val keyPair = AdbKeyPair.readDefault()
