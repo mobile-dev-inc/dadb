@@ -1,5 +1,10 @@
 # Changelog
 
+### 1.1.0
+
+* Fix unicode handling
+* Add Dadb.installMultiple
+
 ### 1.0.0
 
 * Fix: adbkey.pub is no longer required
