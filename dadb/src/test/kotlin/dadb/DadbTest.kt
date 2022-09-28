@@ -155,7 +155,7 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
     @Test
     fun adbPull_largeFile() {
         localEmulator { dadb ->
-            val sizeMb = 100
+            val sizeMb = 10
 
             dadb.shell("fallocate -l ${sizeMb}M $remotePath")
 
