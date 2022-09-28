@@ -83,7 +83,7 @@ class AdbServerDadb private constructor(
             adbServerHost: String = "localhost",
             adbServerPort: Int = 5037,
             deviceQuery: String = "host:transport-any"
-        ): AdbServerDadb {
+        ): Dadb {
             return AdbServerDadb(adbServerHost, adbServerPort, deviceQuery)
         }
 
