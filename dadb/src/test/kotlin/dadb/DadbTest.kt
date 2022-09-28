@@ -22,6 +22,7 @@ import okio.Buffer
 import okio.buffer
 import okio.source
 import org.junit.Rule
+import org.junit.jupiter.api.AfterEach
 import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
 import java.net.Socket
@@ -37,6 +38,8 @@ import kotlin.test.Test
 
 internal abstract class DadbTest : BaseConcurrencyTest() {
 
+    private val remotePath = "/data/local/tmp/hello"
+
     @JvmField
     @Rule
     val temporaryFolder = TemporaryFolder()
@@ -46,6 +49,13 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
     @BeforeTest
     open fun setUp() {
         temporaryFolder.create()
+    }
+
+    @AfterEach
+    internal fun tearDown() {
+        localEmulator { dadb ->
+            dadb.shell("rm -f $remotePath")
+        }
     }
 
     @Test
@@ -110,7 +120,6 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
     fun adbPush_basic() {
         localEmulator { dadb ->
             val content = randomString()
-            val remotePath = "/data/local/tmp/hello"
 
             val source = ByteArrayInputStream(content.toByteArray()).source()
             dadb.push(source, remotePath, 439, System.currentTimeMillis())
@@ -146,7 +155,6 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
     @Test
     fun adbPull_largeFile() {
         localEmulator { dadb ->
-            val remotePath = "/data/local/tmp/hello"
             val sizeMb = 100
 
             dadb.shell("fallocate -l ${sizeMb}M $remotePath")
@@ -163,7 +171,6 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
     fun adbPush_file() {
         localEmulator { dadb ->
             val content = randomString()
-            val remotePath = "/data/local/tmp/hello"
             val localSrcFile = temporaryFolder.newFile().apply { writeText(content) }
 
             dadb.push(localSrcFile, remotePath, 439, System.currentTimeMillis())
