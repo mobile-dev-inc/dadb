@@ -21,17 +21,24 @@ import okio.*
 import java.lang.Integer.min
 import java.nio.ByteBuffer
 
-class AdbStream internal constructor(
+interface AdbStream : AutoCloseable {
+
+    val source: BufferedSource
+
+    val sink: BufferedSink
+}
+
+internal class AdbStreamImpl internal constructor(
         private val messageQueue: AdbMessageQueue,
         private val adbWriter: AdbWriter,
         private val maxPayloadSize: Int,
-        val localId: Int,
-        val remoteId: Int
-) : AutoCloseable {
+        private val localId: Int,
+        private val remoteId: Int
+) : AdbStream {
 
     private var isClosed = false
 
-    val source = object : Source {
+    override val source = object : Source {
 
         private var message: AdbMessage? = null
         private var bytesRead = 0
@@ -69,7 +76,7 @@ class AdbStream internal constructor(
         override fun timeout() = Timeout.NONE
     }.buffer()
 
-    val sink = object : Sink {
+    override val sink = object : Sink {
 
         private val buffer = ByteBuffer.allocate(maxPayloadSize)
 

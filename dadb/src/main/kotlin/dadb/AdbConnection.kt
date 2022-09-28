@@ -47,7 +47,7 @@ internal class AdbConnection internal constructor(
             adbWriter.writeOpen(localId, destination)
             val message = messageQueue.take(localId, Constants.CMD_OKAY)
             val remoteId = message.arg0
-            return AdbStream(messageQueue, adbWriter, maxPayloadSize, localId, remoteId)
+            return AdbStreamImpl(messageQueue, adbWriter, maxPayloadSize, localId, remoteId)
         } catch (e: Throwable) {
             messageQueue.stopListening(localId)
             throw e
