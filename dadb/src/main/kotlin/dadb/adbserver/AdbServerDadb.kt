@@ -22,7 +22,7 @@ class AdbServerDadb private constructor(
     private val supportedFeatures: Set<String>
 
     init {
-        supportedFeatures = open("host:host-features").use {
+        supportedFeatures = open("host:features").use {
             val features = readString(DataInputStream(it.source.inputStream()))
             features.split(",").toSet()
         }
