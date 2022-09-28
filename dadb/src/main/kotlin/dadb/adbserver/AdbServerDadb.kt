@@ -2,7 +2,9 @@ package dadb.adbserver
 
 import dadb.AdbStream
 import dadb.Dadb
-import okio.*
+import okio.buffer
+import okio.sink
+import okio.source
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
@@ -16,6 +18,15 @@ class AdbServerDadb private constructor(
     private val port: Int,
     private val deviceQuery: String,
 ) : Dadb {
+
+    private val supportedFeatures: Set<String>
+
+    init {
+        supportedFeatures = open("host:host-features").use {
+            val features = readString(DataInputStream(it.source.inputStream()))
+            features.split(",").toSet()
+        }
+    }
 
     override fun open(destination: String): AdbStream {
         val socket = Socket(host, port)
