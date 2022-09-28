@@ -50,9 +50,14 @@ class AdbServerDadb private constructor(
 
     companion object {
 
+        /**
+         * Experimental API
+         */
+        @JvmStatic
+        @JvmOverloads
         fun create(
-            adbServerHost: String,
-            adbServerPort: Int,
+            adbServerHost: String = "localhost",
+            adbServerPort: Int = 5037,
             deviceQuery: String = "host:transport-any"
         ): AdbServerDadb {
             return AdbServerDadb(adbServerHost, adbServerPort, deviceQuery)
