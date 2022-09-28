@@ -35,7 +35,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Ignore
 import kotlin.test.Test
 
-internal class DadbTest : BaseConcurrencyTest() {
+internal abstract class DadbTest : BaseConcurrencyTest() {
 
     @JvmField
     @Rule
@@ -284,13 +284,7 @@ internal class DadbTest : BaseConcurrencyTest() {
         }
     }
 
-    private fun localEmulator(body: (dadb: Dadb) -> Unit) {
-        val socket = Socket("localhost", 5555)
-        val keyPair = AdbKeyPair.readDefault()
-        val connection = AdbConnection.connect(socket, keyPair)
-        TestDadb(connection).use(body)
-        connection.ensureEmpty()
-    }
+    protected abstract fun localEmulator(body: (dadb: Dadb) -> Unit)
 
     private fun readSocketAsync(host: String, port: Int): Future<String> {
         return executor
@@ -320,15 +314,4 @@ internal class DadbTest : BaseConcurrencyTest() {
     private fun randomString(): String {
         return "${Random().nextDouble()}"
     }
-}
-
-private class TestDadb(
-    private val connection: AdbConnection,
-) : Dadb {
-
-    override fun open(destination: String) = connection.open(destination)
-
-    override fun supportsFeature(feature: String) = connection.supportsFeature(feature)
-
-    override fun close() = connection.close()
 }

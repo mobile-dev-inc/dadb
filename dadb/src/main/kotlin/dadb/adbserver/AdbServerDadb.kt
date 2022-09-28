@@ -11,7 +11,7 @@ import java.net.Socket
 import java.nio.charset.StandardCharsets
 
 
-internal class AdbServerDadb(
+class AdbServerDadb private constructor(
     private val host: String,
     private val port: Int,
     private val deviceQuery: String,
@@ -39,8 +39,12 @@ internal class AdbServerDadb(
 
     companion object {
 
-        fun create(host: String, port: Int): AdbServerDadb {
-            return AdbServerDadb(host, port, "host:transport-any")
+        fun create(
+            adbServerHost: String,
+            adbServerPort: Int,
+            deviceQuery: String = "host:transport-any"
+        ): AdbServerDadb {
+            return AdbServerDadb(adbServerHost, adbServerPort, deviceQuery)
         }
 
         private fun send(socket: Socket, command: String) {
@@ -76,9 +80,4 @@ internal class AdbServerDadb(
             return String(responseBuffer, StandardCharsets.UTF_8)
         }
     }
-}
-
-fun main() {
-    val dadb = AdbServerDadb.create("localhost", 5037)
-    println(dadb.shell("echo hello"))
 }
