@@ -22,16 +22,16 @@ import okio.Buffer
 import okio.buffer
 import okio.source
 import org.junit.Rule
-import org.junit.jupiter.api.AfterEach
 import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
 import java.net.Socket
 import java.nio.charset.StandardCharsets
-import java.util.Random
+import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
+import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -51,7 +51,7 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
         temporaryFolder.create()
     }
 
-    @AfterEach
+    @AfterTest
     internal fun tearDown() {
         localEmulator { dadb ->
             dadb.shell("rm -f $remotePath")
