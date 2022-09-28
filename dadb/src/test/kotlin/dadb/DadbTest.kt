@@ -44,9 +44,8 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
     val executor = Executors.newCachedThreadPool()
 
     @BeforeTest
-    fun setUp() {
+    open fun setUp() {
         temporaryFolder.create()
-//        killServer()
     }
 
     @Test
