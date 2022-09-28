@@ -52,6 +52,30 @@ class AdbServerDadb private constructor(
 
         /**
          * Experimental API
+         *
+         * Possible deviceQuery values:
+         *
+         * host:transport:<serial-number>
+         *     Ask to switch the connection to the device/emulator identified by
+         *     <serial-number>. After the OKAY response, every client request will
+         *     be sent directly to the adbd daemon running on the device.
+         *     (Used to implement the -s option)
+         *
+         * host:transport-usb
+         *     Ask to switch the connection to one device connected through USB
+         *     to the host machine. This will fail if there are more than one such
+         *     devices. (Used to implement the -d convenience option)
+         *
+         * host:transport-local
+         *     Ask to switch the connection to one emulator connected through TCP.
+         *     This will fail if there is more than one such emulator instance
+         *     running. (Used to implement the -e convenience option)
+         *
+         * host:transport-any
+         *     Another host:transport variant. Ask to switch the connection to
+         *     either the device or emulator connect to/running on the host.
+         *     Will fail if there is more than one such device/emulator available.
+         *     (Used when neither -s, -d or -e are provided)
          */
         @JvmStatic
         @JvmOverloads
