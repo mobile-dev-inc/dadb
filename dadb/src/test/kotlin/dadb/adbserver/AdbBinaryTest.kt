@@ -9,5 +9,6 @@ internal class AdbBinaryTest {
     fun test() {
         killServer()
         AdbBinary.ensureServerRunning("localhost", 5037)
+        AdbServerDadb.create("localhost", 5037).shell("echo hello")
     }
 }

@@ -40,7 +40,7 @@ class AdbServerDadb private constructor(
     }
 
     override fun supportsFeature(feature: String): Boolean {
-        return true
+        return feature in supportedFeatures
     }
 
     override fun close() {}
