@@ -152,7 +152,6 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
         }
     }
 
-    @Ignore("Fails with device offline on CI")
     @Test
     fun adbPull_largeFile() {
         localEmulator { dadb ->

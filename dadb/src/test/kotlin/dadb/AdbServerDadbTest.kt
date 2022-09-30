@@ -12,6 +12,6 @@ internal class AdbServerDadbTest : DadbTest() {
     }
 
     override fun localEmulator(body: (dadb: Dadb) -> Unit) {
-        AdbServerDadb.create().use(body)
+        AdbServerDadb.create("localhost", 5037).use(body)
     }
 }
