@@ -1,14 +1,19 @@
 package dadb
 
+import com.google.common.truth.Truth.assertThat
 import dadb.adbserver.AdbServerDadb
-import org.junit.jupiter.api.BeforeEach
+
+import kotlin.test.Test
 
 internal class AdbServerDadbTest : DadbTest() {
 
-    @BeforeEach
-    override fun setUp() {
-        super.setUp()
-        startServer()
+    @Test
+    internal fun stoppedServer() {
+        killServer()
+        localEmulator { dadb ->
+            val output = dadb.shell("echo hello").allOutput
+            assertThat(output).isEqualTo("hello\n")
+        }
     }
 
     override fun localEmulator(body: (dadb: Dadb) -> Unit) {

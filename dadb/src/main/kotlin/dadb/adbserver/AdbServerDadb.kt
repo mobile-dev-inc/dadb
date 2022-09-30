@@ -26,6 +26,7 @@ class AdbServerDadb private constructor(
     }
 
     override fun open(destination: String): AdbStream {
+        AdbBinary.ensureServerRunning(host, port)
         val socket = Socket(host, port)
         send(socket, deviceQuery)
         send(socket, destination)
