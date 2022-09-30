@@ -29,7 +29,7 @@ internal class AdbStreamTest {
         val adbReader = createAdbReader(1, 2, payload)
         val messageQueue = AdbMessageQueue(adbReader)
         messageQueue.startListening(1)
-        val stream = AdbStream(messageQueue, AdbWriter(Buffer()), 1024, 1, 2)
+        val stream = AdbStreamImpl(messageQueue, AdbWriter(Buffer()), 1024, 1, 2)
         Truth.assertThat(stream.source.readByteArray()).isEqualTo(payload)
     }
 

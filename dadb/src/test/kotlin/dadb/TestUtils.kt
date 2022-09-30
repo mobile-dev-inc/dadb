@@ -39,6 +39,12 @@ fun killServer() {
     } catch (ignore: IOException) {}
 }
 
+fun startServer() {
+    try {
+        Runtime.getRuntime().exec("adb start-server").waitFor()
+    } catch (ignore: IOException) {}
+}
+
 fun CompletableFuture<*>.waitFor() {
     get(1000, TimeUnit.MILLISECONDS)
 }

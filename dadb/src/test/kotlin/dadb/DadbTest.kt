@@ -26,16 +26,19 @@ import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
 import java.net.Socket
 import java.nio.charset.StandardCharsets
-import java.util.Random
+import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
+import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Ignore
 import kotlin.test.Test
 
-internal class DadbTest : BaseConcurrencyTest() {
+internal abstract class DadbTest : BaseConcurrencyTest() {
+
+    private val remotePath = "/data/local/tmp/hello"
 
     @JvmField
     @Rule
@@ -46,7 +49,13 @@ internal class DadbTest : BaseConcurrencyTest() {
     @BeforeTest
     fun setUp() {
         temporaryFolder.create()
-//        killServer()
+    }
+
+    @AfterTest
+    internal fun tearDown() {
+        localEmulator { dadb ->
+            dadb.shell("rm -f $remotePath")
+        }
     }
 
     @Test
@@ -111,7 +120,6 @@ internal class DadbTest : BaseConcurrencyTest() {
     fun adbPush_basic() {
         localEmulator { dadb ->
             val content = randomString()
-            val remotePath = "/data/local/tmp/hello"
 
             val source = ByteArrayInputStream(content.toByteArray()).source()
             dadb.push(source, remotePath, 439, System.currentTimeMillis())
@@ -147,7 +155,6 @@ internal class DadbTest : BaseConcurrencyTest() {
     @Test
     fun adbPull_largeFile() {
         localEmulator { dadb ->
-            val remotePath = "/data/local/tmp/hello"
             val sizeMb = 100
 
             dadb.shell("fallocate -l ${sizeMb}M $remotePath")
@@ -164,7 +171,6 @@ internal class DadbTest : BaseConcurrencyTest() {
     fun adbPush_file() {
         localEmulator { dadb ->
             val content = randomString()
-            val remotePath = "/data/local/tmp/hello"
             val localSrcFile = temporaryFolder.newFile().apply { writeText(content) }
 
             dadb.push(localSrcFile, remotePath, 439, System.currentTimeMillis())
@@ -284,13 +290,7 @@ internal class DadbTest : BaseConcurrencyTest() {
         }
     }
 
-    private fun localEmulator(body: (dadb: Dadb) -> Unit) {
-        val socket = Socket("localhost", 5555)
-        val keyPair = AdbKeyPair.readDefault()
-        val connection = AdbConnection.connect(socket, keyPair)
-        TestDadb(connection).use(body)
-        connection.ensureEmpty()
-    }
+    protected abstract fun localEmulator(body: (dadb: Dadb) -> Unit)
 
     private fun readSocketAsync(host: String, port: Int): Future<String> {
         return executor
@@ -312,7 +312,7 @@ internal class DadbTest : BaseConcurrencyTest() {
         val future = executor.submit {
             dadb.shell("echo -e '$message' | nc -lp $port")
         }
-        Thread.sleep(100)
+        Thread.sleep(500)
 
         return future
     }
@@ -320,15 +320,4 @@ internal class DadbTest : BaseConcurrencyTest() {
     private fun randomString(): String {
         return "${Random().nextDouble()}"
     }
-}
-
-private class TestDadb(
-    private val connection: AdbConnection,
-) : Dadb {
-
-    override fun open(destination: String) = connection.open(destination)
-
-    override fun supportsFeature(feature: String) = connection.supportsFeature(feature)
-
-    override fun close() = connection.close()
 }
