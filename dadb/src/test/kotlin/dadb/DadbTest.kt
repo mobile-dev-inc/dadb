@@ -312,7 +312,7 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
         val future = executor.submit {
             dadb.shell("echo -e '$message' | nc -lp $port")
         }
-        Thread.sleep(100)
+        Thread.sleep(500)
 
         return future
     }
