@@ -1,8 +1,8 @@
 # Changelog
 
-### 1.1.1-SNAPSHOT
+### 1.2.0
 
-* 
+* Add experimental API AdbServerDadb.create to connect to an adb server
 
 ### 1.1.0
 
