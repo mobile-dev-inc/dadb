@@ -4,6 +4,7 @@ import java.io.File
 import java.io.IOException
 import java.net.Socket
 import java.util.*
+import kotlin.system.measureTimeMillis
 
 object AdbBinary {
 
@@ -18,6 +19,9 @@ object AdbBinary {
                 "No running adb server found at $adbServerHost:$adbServerPort and unable to discover an adb binary."
             )
             startServer(adbBinary, adbServerPort)
+            // Immediately after starting the adb server, emulators show as offline.
+            // This is a hack to work around this behavior.
+            Thread.sleep(200)
         }
     }
 
@@ -34,7 +38,7 @@ object AdbBinary {
 
     private fun isServerRunning(adbServerHost: String, adbServerPort: Int): Boolean {
         return try {
-            Socket(adbServerHost, adbServerPort)
+            Socket(adbServerHost, adbServerPort).close()
             true
         } catch (e: Exception) {
             false
