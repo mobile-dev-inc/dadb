@@ -19,6 +19,10 @@ plugins {
 }
 
 allprojects {
+    tasks.withType(JavaCompile::class.java) {
+        sourceCompatibility = "1.8"
+        targetCompatibility = "1.8"
+    }
     tasks.withType(KotlinCompile::class.java) {
         kotlinOptions {
             jvmTarget = "1.8"
