@@ -103,7 +103,6 @@ val adbKeyPair = AdbKeyPair.read(privateKeyFile, publicKeyFile)
 Dadb.create("localhost", 5555, adbKeyPair)
 ```
 
-
 # License
 
 ```
