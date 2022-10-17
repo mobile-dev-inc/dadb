@@ -1,5 +1,9 @@
 # Changelog
 
+### 1.2.1
+
+* Fix push for API 24
+
 ### 1.2.0
 
 * Add experimental API AdbServerDadb.create to connect to an adb server
