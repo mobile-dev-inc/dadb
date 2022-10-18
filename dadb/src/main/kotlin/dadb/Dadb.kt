@@ -134,15 +134,47 @@ interface Dadb : AutoCloseable {
                 }
             }
         } else {
+            val totalLength = apks.map { it.length() }.reduce { acc, l ->  acc + l }
+            // step1: create session
+            val response = shell("pm install-create -S $totalLength ${options.joinToString(" ")}")
+            if (!response.allOutput.startsWith("Success")) {
+                throw IOException("pm create session failed: $response")
+            }
+
+            val pattern = """\[(\w+)]""".toRegex()
+            val sessionId = pattern.find(response.allOutput)?.groups?.get(1)?.value ?: throw IOException("failed to create session")
+            var success = true
+
             val fileNames = apks.map { it.name }
             val remotePaths = fileNames.map { "/data/local/tmp/$it" }
 
-            apks.zip(remotePaths) { apk, path ->
-                push(apk, path)
+            // step2: write apk to the session
+            apks.zip(remotePaths).forEachIndexed { index, pair ->
+                val apk = pair.first
+                val remotePath = pair.second
+
+                try {
+                    // we should push the apk files to device, when push failed, it would stop the installation
+                    push(apk, remotePath)
+                } catch (t: IOException) {
+                    success = false
+                    return@forEachIndexed
+                }
+
+                // pm install-write -S APK_SIZE SESSION_ID INDEX PATH
+                val writeResponse = shell("pm install-write -S ${apk.length()} $sessionId $index $remotePath")
+                if (!writeResponse.allOutput.startsWith("Success")) {
+                    success = false
+                    return@forEachIndexed
+                }
             }
 
-            val installPath = remotePaths.joinToString(" ")
-            shell("pm install ${options.joinToString(" ")} $installPath")
+            // step3: commit or abandon the session
+            val finalCommand = if (success) "pm install-commit $sessionId" else "pm install-abandon $sessionId"
+            val finalResponse = shell(finalCommand)
+            if (!finalResponse.allOutput.startsWith("Success")) {
+                throw IOException("failed to finalize session: $finalResponse")
+            }
         }
     }
 
