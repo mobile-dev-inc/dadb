@@ -96,6 +96,7 @@ interface Dadb : AutoCloseable {
         }
     }
 
+    @Throws(IOException::class)
     fun installMultiple(apks: List<File>, vararg options: String) {
         // http://aospxref.com/android-12.0.0_r3/xref/packages/modules/adb/client/adb_install.cpp#538
         if (supportsFeature("abb_exec")) {
