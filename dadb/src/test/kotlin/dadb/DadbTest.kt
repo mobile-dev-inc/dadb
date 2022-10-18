@@ -213,8 +213,8 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
     fun installMultiple() {
         localEmulator { dadb ->
             dadb.installMultiple(TestApk.SPLIT_FILES)
-            val response = dadb.shell("pm list packages ${TestApk.SPLIT_PACKAGE_NAME}")
-            assertShellResponse(response, 0, "package:${TestApk.SPLIT_PACKAGE_NAME}\n")
+            val response = dadb.shell("pm path ${TestApk.SPLIT_PACKAGE_NAME} | wc -l")
+            assertShellResponse(response, 0, "${TestApk.SPLIT_FILES.size}\n")
         }
     }
 
