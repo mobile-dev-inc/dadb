@@ -109,7 +109,7 @@ interface Dadb : AutoCloseable {
                 val pattern = """\[(\w+)]""".toRegex()
                 val sessionId = pattern.find(response)?.groups?.get(1)?.value ?: throw IOException("failed to create session")
 
-                var success = true
+                var error: String? = null
                 apks.forEach { apk->
                     // install write every apk file to stream
                     abbExec("package", "install-write", "-S", apk.length().toString(), sessionId, apk.name, "-", *options).use { writeStream->
@@ -118,19 +118,23 @@ interface Dadb : AutoCloseable {
 
                         val writeResponse = writeStream.source.readString(Charsets.UTF_8)
                         if (!writeResponse.startsWith("Success")) {
-                            success = false
+                            error = writeResponse
                             return@forEach
                         }
                     }
                 }
 
                 // commit the session
-                val finalCommand = if (success) "install-commit" else "install-abandon"
+                val finalCommand = if (error == null) "install-commit" else "install-abandon"
                 abbExec("package", finalCommand, sessionId, *options).use { commitStream->
                     val finalResponse = commitStream.source.readString(Charsets.UTF_8)
                     if (!finalResponse.startsWith("Success")) {
                         throw IOException("failed to finalize session: $commitStream")
                     }
+                }
+
+                if (error != null) {
+                    throw IOException("Install failed: $error")
                 }
             }
         } else {
@@ -143,7 +147,7 @@ interface Dadb : AutoCloseable {
 
             val pattern = """\[(\w+)]""".toRegex()
             val sessionId = pattern.find(response.allOutput)?.groups?.get(1)?.value ?: throw IOException("failed to create session")
-            var success = true
+            var error: String? = null
 
             val fileNames = apks.map { it.name }
             val remotePaths = fileNames.map { "/data/local/tmp/$it" }
@@ -157,23 +161,26 @@ interface Dadb : AutoCloseable {
                     // we should push the apk files to device, when push failed, it would stop the installation
                     push(apk, remotePath)
                 } catch (t: IOException) {
-                    success = false
+                    error = t.message
                     return@forEachIndexed
                 }
 
                 // pm install-write -S APK_SIZE SESSION_ID INDEX PATH
                 val writeResponse = shell("pm install-write -S ${apk.length()} $sessionId $index $remotePath")
                 if (!writeResponse.allOutput.startsWith("Success")) {
-                    success = false
+                    error = writeResponse.allOutput
                     return@forEachIndexed
                 }
             }
 
             // step3: commit or abandon the session
-            val finalCommand = if (success) "pm install-commit $sessionId" else "pm install-abandon $sessionId"
+            val finalCommand = if (error == null) "pm install-commit $sessionId" else "pm install-abandon $sessionId"
             val finalResponse = shell(finalCommand)
             if (!finalResponse.allOutput.startsWith("Success")) {
                 throw IOException("failed to finalize session: $finalResponse")
+            }
+            if (error != null) {
+                throw IOException("Install failed: $error");
             }
         }
     }
