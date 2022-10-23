@@ -28,35 +28,40 @@ Dadb.create("localhost", 5555).use { dadb ->
 
 ### Discover a Device
 
-Searches `localhost` ports `5555` through `5683` for a valid adb device:  
+The following discovers and returns a connected device or emulator. If there are multiple it returns the first one found.
 
 ```kotlin
-val dadb = Dadb.discover("localhost")
+val dadb = Dadb.discover()
 if (dadb == null) throw RuntimeException("No adb device found")
+```
+
+Use the following API if you want to list all available devices:
+
+```kotlin
+val dadbs = Dadb.list()
 ```
 
 ### Connecting to a physical device
 
-#### Connect over Wi-Fi - Android 11+ (Wi-Fi Pairing)
+*Prerequisite: Connecting to a physical device requires a running adb server. In most cases, this means that you must have the `adb` binary installed on your machine.*
 
-1. Pair your device over wifi using the standard `adb pair HOST:PORT CODE` command ([docs](https://developer.android.com/studio/command-line/adb#connect-to-a-device-over-wi-fi-android-11+)).
-    * eg: `adb pair 10.0.0.192:45678 123456`
-2. Tell your device to listen for connections on tcp port 5555.
-    * `adb tcpip 5555`
-4. Once your device is listening for connections on port 5555, dadb can connect to your device using your device's IP address (same as HOST above).
-    * eg: `Dadb.connect(10.0.0.192, 5555)`.
+The `Dadb.discover()` and `Dadb.list()` methods now both support USB-connected devices.
 
-#### Connect over Wi-Fi - Android 10 and below
+```kotlin
+// Both of these will include any USB-connected devices if they are available
+val dadb = Dadb.discover()
+val dadbs = Dadb.list()
+```
 
-1. Tell your device to listen for connections on tcp port 5555 ([docs](https://developer.android.com/studio/command-line/adb#wireless)):
-    * Connect your device via USB, then run `adb tcpip 5555`
-2. Find you device's IP address. (See: [Step 6](https://developer.android.com/studio/command-line/adb#wireless))
-3. Connect to your device's IP address using dadb:
-    * eg: `Dadb.connect(10.0.0.192, 5555)`
+If you'd like to connect directly to a physical device via its serial number. Use the following API:
 
-#### USB
-
-Connections over USB are not currently supported.
+```kotlin
+val dadb = AdbServer.createDadb(
+    adbServerHost = "localhost",
+    adbServerPort = 5037,
+    deviceQuery = "host:transport:${serialNumber}"
+)
+```
 
 ### Install / Uninstall APK
 
