@@ -1,11 +1,11 @@
 package dadb
 
 import com.google.common.truth.Truth.assertThat
-import dadb.adbserver.AdbServerDadb
+import dadb.adbserver.AdbServer
 
 import kotlin.test.Test
 
-internal class AdbServerDadbTest : DadbTest() {
+internal class AdbServerTest : DadbTest() {
 
     @Test
     internal fun stoppedServer() {
@@ -17,6 +17,6 @@ internal class AdbServerDadbTest : DadbTest() {
     }
 
     override fun localEmulator(body: (dadb: Dadb) -> Unit) {
-        AdbServerDadb.create("localhost", 5037).use(body)
+        AdbServer.createDadb("localhost", 5037).use(body)
     }
 }

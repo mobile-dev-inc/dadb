@@ -10,7 +10,7 @@ import java.net.Socket
 import java.nio.charset.StandardCharsets
 
 
-class AdbServerDadb private constructor(
+class AdbServer private constructor(
     private val host: String,
     private val port: Int,
     private val deviceQuery: String,
@@ -77,12 +77,12 @@ class AdbServerDadb private constructor(
          */
         @JvmStatic
         @JvmOverloads
-        fun create(
+        fun createDadb(
             adbServerHost: String = "localhost",
             adbServerPort: Int = 5037,
             deviceQuery: String = "host:transport-any"
         ): Dadb {
-            return AdbServerDadb(adbServerHost, adbServerPort, deviceQuery)
+            return AdbServer(adbServerHost, adbServerPort, deviceQuery)
         }
 
         private fun send(socket: Socket, command: String) {
