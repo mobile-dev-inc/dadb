@@ -1,5 +1,13 @@
 # Changelog
 
+### 1.2.2
+
+* `AdbServerDadb.create` renamed to `AdbServer.createDadb`
+* `Dadb.discover` now supports physical devices (via the adb server)
+* Added `Dadb.list()`
+* Added default host parameter for `Dadb.discover()`
+* Added `AdbServer.listDadbs` (no need to use this directly, use `Dadb.list()`)
+
 ### 1.2.1
 
 * Fix push for API 24
