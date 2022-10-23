@@ -46,7 +46,10 @@ object AdbServer {
         adbServerPort: Int = 5037,
         deviceQuery: String = "host:transport-any"
     ): Dadb {
-        return AdbServerDadb(adbServerHost, adbServerPort, deviceQuery)
+        val name = deviceQuery
+            .removePrefix("host:") // Use the device query without the host: prefix
+            .removePrefix("transport:") // If it's a serial-number, just show that
+        return AdbServerDadb(adbServerHost, adbServerPort, deviceQuery, name)
     }
 
     /**
@@ -115,6 +118,7 @@ private class AdbServerDadb constructor(
     private val host: String,
     private val port: Int,
     private val deviceQuery: String,
+    private val name: String,
 ) : Dadb {
 
     private val supportedFeatures: Set<String>
@@ -146,8 +150,14 @@ private class AdbServerDadb constructor(
     }
 
     override fun close() {}
+
+    override fun toString(): String {
+        return name
+    }
 }
 fun main() {
     val devices = AdbServer.listDevices()
-    println(AdbServer.createDadb(deviceQuery = "host:transport:${devices[0]}").shell("echo hello").allOutput)
+    val dadb = AdbServer.createDadb(deviceQuery = "host:transport:${devices[0]}")
+    println(dadb)
+    println(dadb.shell("echo hello").allOutput)
 }
