@@ -57,10 +57,10 @@ object AdbServer {
      */
     @JvmStatic
     @JvmOverloads
-    fun listDevices(
+    fun listDadbs(
         adbServerHost: String = "localhost",
         adbServerPort: Int = 5037,
-    ): List<String> {
+    ): List<Dadb> {
         if (!AdbBinary.tryStartServer(adbServerHost, adbServerPort)) {
             return emptyList()
         }
@@ -78,6 +78,7 @@ object AdbServer {
                     parts[0]
                 }
             }
+            .map { createDadb(adbServerHost, adbServerPort, "host:transport:${it}") }
     }
 
     internal fun readString(inputStream: DataInputStream): String {
@@ -154,10 +155,4 @@ private class AdbServerDadb constructor(
     override fun toString(): String {
         return name
     }
-}
-fun main() {
-    val devices = AdbServer.listDevices()
-    val dadb = AdbServer.createDadb(deviceQuery = "host:transport:${devices[0]}")
-    println(dadb)
-    println(dadb.shell("echo hello").allOutput)
 }

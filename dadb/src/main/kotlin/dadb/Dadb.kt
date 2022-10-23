@@ -17,6 +17,7 @@
 
 package dadb
 
+import dadb.adbserver.AdbServer
 import dadb.forwarding.TcpForwarder
 import okio.*
 import java.io.File
@@ -197,15 +198,29 @@ interface Dadb : AutoCloseable {
 
         @JvmStatic
         @JvmOverloads
-        fun discover(host: String, keyPair: AdbKeyPair? = AdbKeyPair.readDefault()): Dadb? {
-            (MIN_EMULATOR_PORT .. MAX_EMULATOR_PORT).forEach { port ->
+        fun discover(host: String = "localhost", keyPair: AdbKeyPair? = AdbKeyPair.readDefault()): Dadb? {
+            return list(host, keyPair).firstOrNull()
+        }
+
+        @JvmStatic
+        @JvmOverloads
+        fun list(host: String = "localhost", keyPair: AdbKeyPair? = AdbKeyPair.readDefault()): List<Dadb> {
+            val dadbs = AdbServer.listDadbs(adbServerHost = host)
+            if (dadbs.isNotEmpty()) return dadbs
+
+            return (MIN_EMULATOR_PORT .. MAX_EMULATOR_PORT).mapNotNull { port ->
                 val dadb = create(host, port, keyPair)
-                try {
-                    val response = dadb.shell("echo success")
-                    if (response.allOutput == "success\n") return dadb
-                } catch (ignore : Throwable) {}
+                val response = try {
+                    dadb.shell("echo success").allOutput
+                } catch (ignore : Throwable) {
+                    null
+                }
+                if (response == "success\n") {
+                    dadb
+                } else {
+                    null
+                }
             }
-            return null
         }
 
         private fun waitRootOrClose(dadb: Dadb, root: Boolean) {
