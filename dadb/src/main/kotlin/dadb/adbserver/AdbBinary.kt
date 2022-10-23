@@ -6,11 +6,20 @@ import java.net.Socket
 import java.util.*
 import kotlin.system.measureTimeMillis
 
-object AdbBinary {
+internal object AdbBinary {
 
     private val ADB_BINARY: File? by lazy { find() }
 
-    internal fun ensureServerRunning(adbServerHost: String, adbServerPort: Int) {
+    fun tryStartServer(adbServerHost: String, adbServerPort: Int): Boolean {
+        return try {
+            ensureServerRunning(adbServerHost, adbServerPort)
+            true
+        } catch (ignore: Exception) {
+            false
+        }
+    }
+
+    fun ensureServerRunning(adbServerHost: String, adbServerPort: Int) {
         if (!isServerRunning(adbServerHost, adbServerPort)) {
             if (adbServerHost != "localhost") {
                 throw IOException("No running adb server found at $adbServerHost:$adbServerPort.")
