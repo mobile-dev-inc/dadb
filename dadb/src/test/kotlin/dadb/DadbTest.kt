@@ -18,7 +18,6 @@
 package dadb
 
 import com.google.common.truth.Truth.assertThat
-import com.google.common.truth.Truth.assertWithMessage
 import okio.Buffer
 import okio.buffer
 import okio.source
@@ -130,23 +129,6 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
             val pulledContent = buffer.readString(StandardCharsets.UTF_8)
 
             assertThat(pulledContent).isEqualTo(content)
-        }
-    }
-
-    @Test
-    fun adbPush_large() {
-        val size10Mb = 10 * 1024 * 1024
-        localEmulator { dadb ->
-            val content = ByteArray(size10Mb) { (it % Byte.MAX_VALUE).toByte() }
-
-            val source = ByteArrayInputStream(content).source()
-            dadb.push(source, remotePath, 439, System.currentTimeMillis())
-
-            val buffer = Buffer()
-            dadb.pull(buffer, remotePath)
-            val pulledContent = buffer.readByteArray()
-
-            assertByteArraysEqual(pulledContent, content)
         }
     }
 
@@ -337,15 +319,5 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
 
     private fun randomString(): String {
         return "${Random().nextDouble()}"
-    }
-
-    private fun assertByteArraysEqual(actual: ByteArray, expected: ByteArray) {
-        assertWithMessage("Expected array sizes to be the same: ${actual.size} != ${expected.size}")
-            .that(actual.size).isEqualTo(expected.size)
-        expected.forEachIndexed { i, expectedByte ->
-            val actualByte = actual[i]
-            assertWithMessage("Expected bytes to be the same but found different byte at index $i: $actualByte != $expectedByte")
-                .that(expectedByte).isEqualTo(actualByte)
-        }
     }
 }
