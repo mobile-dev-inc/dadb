@@ -17,6 +17,7 @@
 
 package dadb
 
+import okio.BufferedSource
 import okio.Sink
 import okio.buffer
 import java.nio.ByteBuffer
@@ -92,6 +93,17 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
                 flush()
             }
         }
+    }
+
+    fun write(
+        command: Int,
+        arg0: Int,
+        arg1: Int,
+        source: BufferedSource?,
+        length: Long
+    ) {
+        val payload = source?.readByteArray(length)
+        write(command, arg0, arg1, payload, 0, length.toInt())
     }
 
     override fun close() {
