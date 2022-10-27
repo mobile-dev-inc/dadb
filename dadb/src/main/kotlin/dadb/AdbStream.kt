@@ -82,6 +82,9 @@ internal class AdbStreamImpl internal constructor(
             while (remaining > 0) {
                 val bytesToWrite = min(maxPayloadSize.toLong(), remaining)
                 adbWriter.write(Constants.CMD_WRTE, localId, remoteId, source, bytesToWrite)
+                if (nextMessage(Constants.CMD_OKAY) == null) {
+                    throw IOException("Protocol error: Expected OKAY response after WRITE")
+                }
                 remaining -= bytesToWrite
             }
         }
