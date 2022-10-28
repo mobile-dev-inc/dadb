@@ -1,5 +1,9 @@
 # Changelog
 
+### 1.2.4
+
+* Fix slow installation in some cases
+
 ### 1.2.3
 
 * Fix for AdbSync refactor in 1.2.2
