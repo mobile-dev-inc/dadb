@@ -40,8 +40,6 @@ class AdbSyncStream(
         private val stream: AdbStream
 ) : AutoCloseable {
 
-    private val buffer = Buffer()
-
     @Throws(IOException::class)
     fun send(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
         val remote = "$remotePath,$mode"
@@ -52,21 +50,36 @@ class AdbSyncStream(
             flush()
         }
 
-        buffer.clear()
+        val sink = object : Sink {
 
-        while (true) {
-            val read = source.read(buffer, 64_000)
-            if (read == -1L) break
-            writePacket(DATA, read.toInt())
-            val sent = stream.sink.writeAll(buffer)
-            check(read == sent)
+            override fun write(source: Buffer, byteCount: Long) {
+                writePacket(DATA, byteCount.toInt())
+                stream.sink.write(source, byteCount)
+            }
+
+            override fun close() = Unit
+
+            override fun flush() = Unit
+
+            override fun timeout() = Timeout.NONE
         }
+
+        // Use java.io since we can't change the internal Okio segment size
+        val maxDataPacketSize = 64 * 1024
+        val bufferedInput = source.buffer().inputStream()
+        val bufferedOutput = sink.buffer().outputStream().buffered(maxDataPacketSize)
+        bufferedInput.copyTo(bufferedOutput)
+        bufferedOutput.flush()
 
         writePacket(DONE, (lastModifiedMs / 1000).toInt())
 
         stream.sink.flush()
 
         val packet = readPacket()
+        if (packet.id == FAIL) {
+            val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
+            throw IOException("Sync failed: $message")
+        }
         if (packet.id != OKAY) throw IOException("Unexpected sync packet id: ${packet.id}")
     }
 
@@ -78,20 +91,27 @@ class AdbSyncStream(
             flush()
         }
 
-        buffer.clear()
+        val source = object : Source {
 
-        while (true) {
-            val packet = readPacket()
-            if (packet.id == DONE) break
-            if (packet.id == FAIL) {
-                val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
-                throw IOException("Sync failed: $message")
+            override fun read(sink: Buffer, byteCount: Long): Long {
+                val packet = readPacket()
+                if (packet.id == DONE) return -1
+                if (packet.id == FAIL) {
+                    val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
+                    throw IOException("Sync failed: $message")
+                }
+                if (packet.id != DATA) throw IOException("Unexpected sync packet id: ${packet.id}")
+                val chunkSize = packet.arg
+                stream.source.readFully(sink, chunkSize.toLong())
+                return chunkSize.toLong()
             }
-            if (packet.id != DATA) throw IOException("Unexpected sync packet id: ${packet.id}")
-            val chunkSize = packet.arg
-            stream.source.readFully(buffer, chunkSize.toLong())
-            buffer.readAll(sink)
+
+            override fun timeout() = Timeout.NONE
+
+            override fun close() = Unit
         }
+
+        source.buffer().readAll(sink)
 
         sink.flush()
     }
