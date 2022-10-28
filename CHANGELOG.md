@@ -1,5 +1,9 @@
 # Changelog
 
+### 1.2.5
+
+* Fix: reverted back refactoring changes from 1.2.1
+
 ### 1.2.4
 
 * Fix slow installation in some cases
