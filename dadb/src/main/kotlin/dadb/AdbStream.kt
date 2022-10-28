@@ -18,7 +18,8 @@
 package dadb
 
 import okio.*
-import kotlin.math.min
+import java.lang.Integer.min
+import java.nio.ByteBuffer
 
 interface AdbStream : AutoCloseable {
 
@@ -77,16 +78,31 @@ internal class AdbStreamImpl internal constructor(
 
     override val sink = object : Sink {
 
+        private val buffer = ByteBuffer.allocate(maxPayloadSize)
+
         override fun write(source: Buffer, byteCount: Long) {
-            var remaining = byteCount
-            while (remaining > 0) {
-                val bytesToWrite = min(maxPayloadSize.toLong(), remaining)
-                adbWriter.write(Constants.CMD_WRTE, localId, remoteId, source, bytesToWrite)
-                remaining -= bytesToWrite
+            var remainingBytes = byteCount
+            while (true) {
+                remainingBytes -= writeToBuffer(source, byteCount)
+                if (remainingBytes == 0L) return
+                check(remainingBytes > 0L)
             }
         }
 
-        override fun flush() {}
+        private fun writeToBuffer(source: BufferedSource, byteCount: Long): Int {
+            val bytesToWrite = min(buffer.remaining(), byteCount.toInt())
+            val bytesWritten = source.read(buffer.array(), buffer.position(), bytesToWrite)
+
+            buffer.position(buffer.position() + bytesWritten)
+            if (buffer.remaining() == 0) flush()
+
+            return bytesWritten
+        }
+
+        override fun flush() {
+            adbWriter.writeWrite(localId, remoteId, buffer.array(), 0, buffer.position())
+            buffer.clear()
+        }
 
         override fun close() {}
 

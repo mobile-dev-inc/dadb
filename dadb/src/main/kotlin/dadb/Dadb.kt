@@ -46,9 +46,7 @@ interface Dadb : AutoCloseable {
 
     @Throws(IOException::class)
     fun push(src: File, remotePath: String, mode: Int = readMode(src), lastModifiedMs: Long = src.lastModified()) {
-        src.source().use {
-            push(it, remotePath, mode, lastModifiedMs)
-        }
+        push(src.source(), remotePath, mode, lastModifiedMs)
     }
 
     @Throws(IOException::class)
@@ -60,9 +58,7 @@ interface Dadb : AutoCloseable {
 
     @Throws(IOException::class)
     fun pull(dst: File, remotePath: String) {
-        dst.sink(append = false).use {
-            pull(it, remotePath)
-        }
+        pull(dst.sink(append = false), remotePath)
     }
 
     @Throws(IOException::class)
