@@ -1,5 +1,9 @@
 # Changelog
 
+### 1.2.3
+
+* Fix for AdbSync refactor in 1.2.2
+
 ### 1.2.2
 
 * `AdbServerDadb.create` renamed to `AdbServer.createDadb`
