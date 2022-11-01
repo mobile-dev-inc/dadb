@@ -1,5 +1,9 @@
 # Changelog
 
+### 1.2.6
+
+* When generating adb keys, ensure that parent directories are created if needed
+
 ### 1.2.5
 
 * Fix: reverted back refactoring changes from 1.2.1
