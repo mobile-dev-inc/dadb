@@ -100,6 +100,9 @@ class AdbKeyPair(
                 it.genKeyPair()
             }
 
+            privateKeyFile.absoluteFile.parentFile?.mkdirs()
+            publicKeyFile.absoluteFile.parentFile?.mkdirs()
+
             privateKeyFile.writer().use { out ->
                 val base64 = Base64.getMimeEncoder(64, "\n".toByteArray())
                 out.write("-----BEGIN PRIVATE KEY-----\n")
