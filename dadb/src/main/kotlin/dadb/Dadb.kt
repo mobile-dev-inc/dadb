@@ -76,8 +76,8 @@ interface Dadb : AutoCloseable {
 
     @Throws(IOException::class)
     fun install(file: File, vararg options: String) {
-        if (supportsFeature("abb_exec")) {
-            abbExec("package", "install", "-S", file.length().toString(), *options).use { stream ->
+        if (supportsFeature("cmd")) {
+            execCmd("package", "install", "-S", file.length().toString(), *options).use { stream ->
                 stream.sink.writeAll(file.source())
                 stream.sink.flush()
                 val response = stream.source.readString(Charsets.UTF_8)
@@ -96,9 +96,9 @@ interface Dadb : AutoCloseable {
     @Throws(IOException::class)
     fun installMultiple(apks: List<File>, vararg options: String) {
         // http://aospxref.com/android-12.0.0_r3/xref/packages/modules/adb/client/adb_install.cpp#538
-        if (supportsFeature("abb_exec")) {
+        if (supportsFeature("cmd")) {
             val totalLength = apks.map { it.length() }.reduce { acc, l ->  acc + l }
-            abbExec("package", "install-create", "-S", totalLength.toString(), *options).use { createStream ->
+            execCmd("package", "install-create", "-S", totalLength.toString(), *options).use { createStream ->
                 val response = createStream.source.readString(Charsets.UTF_8)
                 if (!response.startsWith("Success")) {
                     throw IOException("connect error for create: $response")
@@ -109,7 +109,7 @@ interface Dadb : AutoCloseable {
                 var error: String? = null
                 apks.forEach { apk->
                     // install write every apk file to stream
-                    abbExec("package", "install-write", "-S", apk.length().toString(), sessionId, apk.name, "-", *options).use { writeStream->
+                    execCmd("package", "install-write", "-S", apk.length().toString(), sessionId, apk.name, "-", *options).use { writeStream->
                         writeStream.sink.writeAll(apk.source())
                         writeStream.sink.flush()
 
@@ -123,7 +123,7 @@ interface Dadb : AutoCloseable {
 
                 // commit the session
                 val finalCommand = if (error == null) "install-commit" else "install-abandon"
-                abbExec("package", finalCommand, sessionId, *options).use { commitStream->
+                execCmd("package", finalCommand, sessionId, *options).use { commitStream->
                     val finalResponse = commitStream.source.readString(Charsets.UTF_8)
                     if (!finalResponse.startsWith("Success")) {
                         throw IOException("failed to finalize session: $commitStream")
@@ -188,6 +188,13 @@ interface Dadb : AutoCloseable {
         if (response.exitCode != 0) {
             throw IOException("Uninstall failed: ${response.allOutput}")
         }
+    }
+
+    @Throws(IOException::class)
+    fun execCmd(vararg command: String): AdbStream {
+        if (!supportsFeature("cmd")) throw UnsupportedOperationException("cmd is not supported on this version of Android")
+        val destination = (listOf("exec:cmd") + command).joinToString(" ")
+        return open(destination)
     }
 
     @Throws(IOException::class)
