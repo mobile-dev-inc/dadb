@@ -123,12 +123,15 @@ private class AdbServerDadb constructor(
 ) : Dadb {
 
     private val supportedFeatures: Set<String>
+    private val deviceApiLevel: Int
 
     init {
         supportedFeatures = open("host:features").use {
             val features = AdbServer.readString(DataInputStream(it.source.inputStream()))
             features.split(",").toSet()
         }
+        // ALWAYS do this with protocol 1, otherwise we will end up in endless recursion
+        deviceApiLevel = openShellV1("getprop ro.build.version.sdk").use { it.readAll().trim().toInt() }
     }
 
     override fun open(destination: String): AdbStream {
@@ -148,6 +151,10 @@ private class AdbServerDadb constructor(
 
     override fun supportsFeature(feature: String): Boolean {
         return feature in supportedFeatures
+    }
+
+    override fun getDeviceApiLevel(): Int {
+        return this.deviceApiLevel
     }
 
     override fun close() {}

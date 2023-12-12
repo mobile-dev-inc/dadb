@@ -28,12 +28,12 @@ import java.net.Socket
 import java.util.*
 
 internal class AdbConnection internal constructor(
-        adbReader: AdbReader,
-        private val adbWriter: AdbWriter,
-        private val closeable: Closeable?,
-        private val supportedFeatures: Set<String>,
-        private val version: Int,
-        private val maxPayloadSize: Int
+    adbReader: AdbReader,
+    private val adbWriter: AdbWriter,
+    private val closeable: Closeable?,
+    private val supportedFeatures: Set<String>,
+    private val version: Int,
+    private val maxPayloadSize: Int
 ) : AutoCloseable {
 
     private val random = Random()
@@ -127,11 +127,12 @@ internal class AdbConnection internal constructor(
         // ie: "device::ro.product.name=sdk_gphone_x86;ro.product.model=Android SDK built for x86;ro.product.device=generic_x86;features=fixed_push_symlink_timestamp,apex,fixed_push_mkdir,stat_v2,abb_exec,cmd,abb,shell_v2"
         private fun parseConnectionString(connectionString: String): ConnectionString {
             val keyValues = connectionString.substringAfter("device::")
-                    .split(";")
-                    .map { it.split("=") }
-                    .mapNotNull { if (it.size != 2) null else it[0] to it[1] }
-                    .toMap()
-            if ("features" !in keyValues) throw IOException("Failed to parse features from connection string: $connectionString")
+                .split(";")
+                .map { it.split("=") }
+                .mapNotNull { if (it.size != 2) null else it[0] to it[1] }
+                .toMap()
+            if ("features" !in keyValues)
+                return ConnectionString(emptySet())
             val features = keyValues.getValue("features").split(",").toSet()
             return ConnectionString(features)
         }

@@ -7,12 +7,13 @@ import kotlin.test.assertNotNull
 
 internal class DadbTestImpl : DadbTest() {
 
-    override fun localEmulator(body: (dadb: Dadb) -> Unit) {
+    override fun <T> localEmulator(body: (dadb: Dadb) -> T): T {
         val socket = Socket("localhost", 5555)
         val keyPair = AdbKeyPair.readDefault()
         val connection = AdbConnection.connect(socket, keyPair)
-        TestDadb(connection).use(body)
+        val value = TestDadb(connection).use(body)
         connection.ensureEmpty()
+        return value
     }
 
     private class TestDadb(
@@ -22,6 +23,11 @@ internal class DadbTestImpl : DadbTest() {
         override fun open(destination: String) = connection.open(destination)
 
         override fun supportsFeature(feature: String) = connection.supportsFeature(feature)
+
+        override fun getDeviceApiLevel(): Int {
+            val stream = connection.open("exec:getprop ro.build.version.sdk")
+            return AdbShellV1Stream(stream).use { it.readAll().trim().toInt() }
+        }
 
         override fun close() = connection.close()
     }

@@ -21,6 +21,8 @@ import dadb.adbserver.AdbServer
 import dadb.forwarding.TcpForwarder
 import dadb.forwarding.TcpForwardDescriptor
 import java.io.File
+import java.io.IOException
+import java.lang.IllegalStateException
 import java.nio.file.Files
 import okio.*
 
@@ -33,16 +35,50 @@ interface Dadb : AutoCloseable {
 
     @Throws(IOException::class)
     fun shell(command: String): AdbShellResponse {
-        openShell(command).use { stream ->
-            return stream.readAll()
+        return if (getDeviceApiLevel() < 24) {
+            val stream = openShellV1("$command;echo \"EXIT_CODE_START$?COMMAND_FINISH_MARKER\"")
+            val sb = StringBuilder()
+            do {
+                sb.append(stream.read())
+            } while (!sb.contains("COMMAND_FINISH_MARKER"))
+            stream.close()
+            val value = sb.toString()
+            val exitCodeMarkerIndex = value.indexOf("EXIT_CODE_START")
+            val commandFinishMarkerIndex = value.indexOf("COMMAND_FINISH_MARKER")
+            val content = value.substring(0, exitCodeMarkerIndex)
+            val exitCode =
+                value.substring(exitCodeMarkerIndex + "EXIT_CODE_START".length, commandFinishMarkerIndex).toIntOrNull()
+                    ?: throw IllegalStateException("Failed to capture exit code!")
+
+            AdbShellResponse(content, "", exitCode)
+        } else {
+            openShellV2(command).use { it.readAll() }
         }
     }
 
     @Throws(IOException::class)
-    fun openShell(command: String = ""): AdbShellStream {
-        val stream = open("shell,v2,raw:$command")
-        return AdbShellStream(stream)
+    @Deprecated(message = "Renamed to openShellV2", replaceWith = ReplaceWith("openShellV2"))
+    fun openShell(command: String = "") = openShellV2(command)
+
+    @Throws(IOException::class)
+    fun openShellV1(
+        command: String
+    ): AdbShellV1Stream {
+        return AdbShellV1Stream(open("exec:$command"))
     }
+
+    @Throws(IOException::class)
+    fun openShellV2(
+        command: String
+    ): AdbShellV2Stream {
+        if (getDeviceApiLevel() < 24) {
+            error("Shell V2 protocol is not available on API < 24")
+        }
+        return AdbShellV2Stream(open("shell,v2,raw:$command"))
+    }
+
+    @Throws(IOException::class)
+    fun getDeviceApiLevel(): Int
 
     @Throws(IOException::class)
     fun push(src: File, remotePath: String, mode: Int = readMode(src), lastModifiedMs: Long = src.lastModified()) {
@@ -201,7 +237,7 @@ interface Dadb : AutoCloseable {
 
     @Throws(IOException::class)
     fun uninstall(packageName: String) {
-        val response = shell("cmd package uninstall $packageName")
+        val response = shell("pm uninstall $packageName")
         if (response.exitCode != 0) {
             throw IOException("Uninstall failed: ${response.allOutput}")
         }

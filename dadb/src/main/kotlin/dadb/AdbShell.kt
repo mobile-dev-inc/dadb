@@ -19,9 +19,10 @@
 
 package dadb
 
-import dadb.AdbShellPacket.Exit
-import dadb.AdbShellPacket.StdError
-import dadb.AdbShellPacket.StdOut
+import dadb.AdbShellPacket.*
+import okio.Buffer
+import java.io.ByteArrayOutputStream
+import java.io.Closeable
 import java.io.IOException
 
 const val ID_STDIN = 0
@@ -30,8 +31,19 @@ const val ID_STDERR = 2
 const val ID_EXIT = 3
 const val ID_CLOSE_STDIN = 3
 
-class AdbShellStream(
-        private val stream: AdbStream
+@Deprecated(
+    message = "Renamed to AdbShellV2Stream",
+    replaceWith = ReplaceWith("AdbShellV2Stream", "dadb.AdbShellV2Stream")
+)
+typealias AdbShellStream = AdbShellV2Stream
+
+/**
+ * Stream for the adb v2 shell protocol.
+ * Only works on Android API >= 24
+ * Use [AdbShellV1Stream] for lower API levels.
+ */
+class AdbShellV2Stream(
+    private val stream: AdbStream
 ) : AutoCloseable {
 
     @Throws(IOException::class)
@@ -105,9 +117,10 @@ class AdbShellStream(
 }
 
 sealed class AdbShellPacket(
-        open val payload: ByteArray
+    open val payload: ByteArray
 ) {
     abstract val id: Int
+
     class StdOut(override val payload: ByteArray) : AdbShellPacket(payload) {
         override val id: Int = ID_STDOUT
         override fun toString() = "STDOUT: ${String(payload)}"
@@ -125,12 +138,52 @@ sealed class AdbShellPacket(
 }
 
 class AdbShellResponse(
-        val output: String,
-        val errorOutput: String,
-        val exitCode: Int
+    val output: String,
+    val errorOutput: String,
+    val exitCode: Int
 ) {
 
     val allOutput: String by lazy { "$output$errorOutput" }
 
     override fun toString() = "Shell response ($exitCode):\n$allOutput"
+}
+
+class AdbShellV1Stream(
+    private val stream: AdbStream
+) : Closeable {
+
+    fun read(): String? {
+        val buffer = Buffer()
+        val out = ByteArrayOutputStream()
+        val bytesRead = stream.source.read(buffer, 1024)
+        if (bytesRead == -1L) {
+            return null
+        }
+        buffer.writeTo(out, bytesRead)
+        buffer.flush()
+        return out.toByteArray().toString(Charsets.UTF_8)
+    }
+
+    fun readAll(): String {
+        val sb = StringBuilder()
+        while (!stream.source.exhausted()) {
+            read()?.let { sb.append(it) }
+        }
+        return sb.toString()
+    }
+
+    fun write(string: String) {
+        write(string.toByteArray())
+    }
+
+    fun write(payload: ByteArray?) {
+        with(stream.sink) {
+            if (payload != null) write(payload)
+            flush()
+        }
+    }
+
+    override fun close() {
+        stream.close()
+    }
 }
