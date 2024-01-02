@@ -18,13 +18,35 @@
 package dadb
 
 import org.jetbrains.annotations.TestOnly
+import java.net.InetSocketAddress
 import java.net.Socket
+import kotlin.jvm.Throws
 
-internal class DadbImpl(
+
+internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
         private val host: String,
         private val port: Int,
-        private val keyPair: AdbKeyPair? = null
+        private val keyPair: AdbKeyPair? = null,
+        private val connectTimeout: Int = 0,
+        private val socketTimeout: Int = 0
 ) : Dadb {
+
+    init {
+
+        if (port < 0) {
+            throw IllegalArgumentException("port must be >= 0")
+        }
+
+        if (connectTimeout < 0) {
+            throw IllegalArgumentException("connectTimeout must be >= 0")
+        }
+
+        if (socketTimeout < 0) {
+            throw IllegalArgumentException("socketTimeout must be >= 0")
+        }
+
+    }
+
 
     private var connection: Pair<AdbConnection, Socket>? = null
 
@@ -55,7 +77,10 @@ internal class DadbImpl(
     }
 
     private fun newConnection(): Pair<AdbConnection, Socket> {
-        val socket = Socket(host, port)
+        val socketAddress = InetSocketAddress(host, port)
+        val socket = Socket()
+        socket.soTimeout = socketTimeout
+        socket.connect(socketAddress, connectTimeout)
         val adbConnection = AdbConnection.connect(socket, keyPair)
         return adbConnection to socket
     }
