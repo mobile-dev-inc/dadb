@@ -24,6 +24,8 @@ import okio.source
 import org.junit.Rule
 import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.util.*
@@ -186,6 +188,16 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
     fun install() {
         localEmulator { dadb ->
             dadb.install(TestApk.FILE)
+            val response = dadb.shell("pm list packages ${TestApk.PACKAGE_NAME}")
+            assertShellResponse(response, 0, "package:${TestApk.PACKAGE_NAME}\n")
+        }
+    }
+
+    @Test
+    fun installStream() {
+        localEmulator { dadb ->
+            val inputStream = FileInputStream(TestApk.FILE).source()
+            dadb.install(inputStream, TestApk.FILE.length())
             val response = dadb.shell("pm list packages ${TestApk.PACKAGE_NAME}")
             assertShellResponse(response, 0, "package:${TestApk.PACKAGE_NAME}\n")
         }

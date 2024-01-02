@@ -19,10 +19,10 @@ package dadb
 
 import dadb.adbserver.AdbServer
 import dadb.forwarding.TcpForwarder
-import okio.*
 import java.io.File
-import java.io.IOException
+import java.io.InputStream
 import java.nio.file.Files
+import okio.*
 
 interface Dadb : AutoCloseable {
 
@@ -77,8 +77,17 @@ interface Dadb : AutoCloseable {
     @Throws(IOException::class)
     fun install(file: File, vararg options: String) {
         if (supportsFeature("cmd")) {
-            execCmd("package", "install", "-S", file.length().toString(), *options).use { stream ->
-                stream.sink.writeAll(file.source())
+            install(file.source(), file.length(), *options)
+        } else {
+            pmInstall(file, *options)
+        }
+    }
+
+    @Throws(IOException::class)
+    fun install(source: Source, size: Long, vararg options: String) {
+        if (supportsFeature("cmd")) {
+            execCmd("package", "install", "-S", size.toString(), *options).use { stream ->
+                stream.sink.writeAll(source)
                 stream.sink.flush()
                 val response = stream.source.readString(Charsets.UTF_8)
                 if (!response.startsWith("Success")) {
@@ -86,11 +95,19 @@ interface Dadb : AutoCloseable {
                 }
             }
         } else {
-            val fileName = file.name
-            val remotePath = "/data/local/tmp/$fileName"
-            push(file, remotePath)
-            shell("pm install ${options.joinToString(" ")} \"$remotePath\"")
+            val tempFile = kotlin.io.path.createTempFile()
+            val fileSink = tempFile.sink().buffer()
+            fileSink.writeAll(source)
+            fileSink.flush()
+            pmInstall(tempFile.toFile(), *options)
         }
+    }
+
+    private fun pmInstall(file: File, vararg options: String) {
+        val fileName = file.name
+        val remotePath = "/data/local/tmp/$fileName"
+        push(file, remotePath)
+        shell("pm install ${options.joinToString(" ")} \"$remotePath\"")
     }
 
     @Throws(IOException::class)
