@@ -19,8 +19,8 @@ import kotlin.concurrent.thread
 
 internal class TcpForwarder(
     private val dadb: Dadb,
-    private val hostPort: Int,
     private val targetPort: Int,
+    private val hostPort: Int? = null,
 ) : AutoCloseable {
 
     private var state: State = State.STOPPED
@@ -28,7 +28,7 @@ internal class TcpForwarder(
     private var server: ServerSocket? = null
     private var clientExecutor: ExecutorService? = null
 
-    fun start() {
+    fun start(): Int {
         check(state == State.STOPPED) { "Forwarder is already started at port $hostPort" }
 
         moveToState(State.STARTING)
@@ -49,10 +49,12 @@ internal class TcpForwarder(
         waitFor(10, 5000) {
             state == State.STARTED
         }
+
+        return server!!.localPort
     }
 
     private fun handleForwarding() {
-        val serverRef = ServerSocket(hostPort)
+        val serverRef = ServerSocket(hostPort ?: 0)
         server = serverRef
 
         moveToState(State.STARTED)

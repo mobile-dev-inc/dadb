@@ -240,11 +240,19 @@ interface Dadb : AutoCloseable {
     }
 
     @Throws(InterruptedException::class)
-    fun tcpForward(hostPort: Int, targetPort: Int): AutoCloseable {
-        val forwarder = TcpForwarder(this, hostPort, targetPort)
+    fun tcpForward(targetPort: Int, hostPort: Int): AutoCloseable {
+        val forwarder = TcpForwarder(this, targetPort, hostPort)
         forwarder.start()
 
         return forwarder
+    }
+
+    @Throws(InterruptedException::class)
+    fun tcpForward(targetPort: Int): Pair<AutoCloseable, Int> {
+        val forwarder = TcpForwarder(this, targetPort)
+        val localPort = forwarder.start()
+
+        return forwarder to localPort
     }
 
     companion object {
