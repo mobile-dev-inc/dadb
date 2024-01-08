@@ -17,6 +17,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.concurrent.thread
 
+data class TcpForwardDescriptor(private val resource: AutoCloseable, val localPort: Int): AutoCloseable {
+    override fun close() {
+        resource.close()
+    }
+}
+
 internal class TcpForwarder(
     private val dadb: Dadb,
     private val targetPort: Int,
