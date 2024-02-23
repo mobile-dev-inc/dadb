@@ -24,12 +24,15 @@ import kotlin.jvm.Throws
 
 
 internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
-        private val host: String,
-        private val port: Int,
-        private val keyPair: AdbKeyPair? = null,
+    private val host: String,
+    private val port: Int,
+    private val keyPair: AdbKeyPair? = null,
         private val connectTimeout: Int = 0,
         private val socketTimeout: Int = 0
 ) : Dadb {
+
+    private val deviceApiLevel: Int = openShellV1("getprop ro.build.version.sdk").use { it.readAll().trim().toIntOrNull() }
+        ?: error("failed to read device's API level")
 
     init {
 
@@ -54,6 +57,10 @@ internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
 
     override fun supportsFeature(feature: String): Boolean {
         return connection().supportsFeature(feature)
+    }
+
+    override fun getDeviceApiLevel(): Int {
+        return deviceApiLevel
     }
 
     override fun close() {
