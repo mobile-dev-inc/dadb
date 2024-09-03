@@ -13,6 +13,11 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v3
+      
+      - name: Home
+        run: |
+          echo $JAVA_HOME
+          echo $PATH
 
       - uses: actions/setup-java@v4
         with:
@@ -36,6 +41,11 @@ jobs:
             ~/.android/avd/*
             ~/.android/adb*
           key: avd-29
+
+      - name: Home
+        run: |
+          echo $JAVA_HOME
+          echo $PATH
 
       - name: create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
