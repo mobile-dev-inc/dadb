@@ -26,14 +26,9 @@ jobs:
             ~/.android/adb*
           key: avd-29
 
-      - name: Home
-        run: |
-          echo $JAVA_HOME
-          echo $PATH
-
       - name: create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2.2.0
+        uses: reactivecircus/android-emulator-runner@v2.29.0
         with:
           api-level: 29
           force-avd-creation: false
@@ -42,7 +37,7 @@ jobs:
           script: echo "Generated AVD snapshot for caching."
 
       - name: run tests
-        uses: reactivecircus/android-emulator-runner@v2.2.0
+        uses: reactivecircus/android-emulator-runner@v2.29.0
         with:
           api-level: 29
           force-avd-creation: false
