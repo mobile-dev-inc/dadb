@@ -8,11 +8,20 @@ on:
 
 jobs:
   test:
-    runs-on: macos-13
+    runs-on: macos-12
     timeout-minutes: 15
     steps:
       - name: checkout
         uses: actions/checkout@v3
+        
+      - name: Home
+        run: echo $JAVA_HOME
+      
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu' # See 'Supported distributions' for available options
+          java-version: '8'
+        
       
       - name: Gradle cache
         uses: gradle/gradle-build-action@v2
