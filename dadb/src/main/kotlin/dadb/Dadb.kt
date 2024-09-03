@@ -240,7 +240,7 @@ interface Dadb : AutoCloseable {
     }
 
     @Throws(InterruptedException::class)
-    fun tcpForward(targetPort: Int, hostPort: Int): TcpForwardDescriptor {
+    fun tcpForward(hostPort: Int, targetPort: Int): TcpForwardDescriptor {
         val forwarder = TcpForwarder(this, targetPort, hostPort)
         val localPort = forwarder.start()
 
@@ -266,18 +266,18 @@ interface Dadb : AutoCloseable {
 
         @JvmStatic
         @JvmOverloads
-        fun discover(host: String = "localhost", keyPair: AdbKeyPair? = AdbKeyPair.readDefault()): Dadb? {
-            return list(host, keyPair).firstOrNull()
+        fun discover(host: String = "localhost", keyPair: AdbKeyPair? = AdbKeyPair.readDefault(), connectTimeout: Int = 0, socketTimeout: Int = 0): Dadb? {
+            return list(host, keyPair, connectTimeout, socketTimeout).firstOrNull()
         }
 
         @JvmStatic
         @JvmOverloads
-        fun list(host: String = "localhost", keyPair: AdbKeyPair? = AdbKeyPair.readDefault()): List<Dadb> {
+        fun list(host: String = "localhost", keyPair: AdbKeyPair? = AdbKeyPair.readDefault(), connectTimeout: Int = 0, socketTimeout: Int = 0): List<Dadb> {
             val dadbs = AdbServer.listDadbs(adbServerHost = host)
             if (dadbs.isNotEmpty()) return dadbs
 
             return (MIN_EMULATOR_PORT .. MAX_EMULATOR_PORT).mapNotNull { port ->
-                val dadb = create(host, port, keyPair)
+                val dadb = create(host, port, keyPair, socketTimeout, connectTimeout)
                 val response = try {
                     dadb.shell("echo success").allOutput
                 } catch (ignore : Throwable) {

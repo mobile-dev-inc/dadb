@@ -55,7 +55,7 @@ internal class DadbImplTest {
 
     @Test
     fun discover() {
-        val dadb = Dadb.discover("localhost", AdbKeyPair.readDefault()) ?: fail("Failed to discover emulator")
+        val dadb = Dadb.discover("localhost", AdbKeyPair.readDefault(), 1000, 1000) ?: fail("Failed to discover emulator")
         assertShellResponse(dadb.shell("echo hello"), 0, "hello\n")
     }
 
