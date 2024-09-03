@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 15
     steps:
       - name: checkout
@@ -23,12 +23,6 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '8'
-
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
 
       - name: Gradle cache
         uses: gradle/gradle-build-action@v2
@@ -53,6 +47,7 @@ jobs:
         with:
           api-level: 29
           force-avd-creation: false
+          arch: arm64-v8
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
           script: echo "Generated AVD snapshot for caching."
@@ -61,6 +56,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2.2.0
         with:
           api-level: 29
+          arch: arm64-v8
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
