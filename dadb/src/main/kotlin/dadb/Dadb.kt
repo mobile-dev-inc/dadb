@@ -19,8 +19,8 @@ package dadb
 
 import dadb.adbserver.AdbServer
 import dadb.forwarding.TcpForwarder
-import dadb.forwarding.TcpForwardDescriptor
 import java.io.File
+import java.io.InputStream
 import java.nio.file.Files
 import okio.*
 
@@ -240,19 +240,11 @@ interface Dadb : AutoCloseable {
     }
 
     @Throws(InterruptedException::class)
-    fun tcpForward(hostPort: Int, targetPort: Int): TcpForwardDescriptor {
-        val forwarder = TcpForwarder(this, targetPort, hostPort)
-        val localPort = forwarder.start()
+    fun tcpForward(hostPort: Int, targetPort: Int): AutoCloseable {
+        val forwarder = TcpForwarder(this, hostPort, targetPort)
+        forwarder.start()
 
-        return TcpForwardDescriptor(forwarder, localPort)
-    }
-
-    @Throws(InterruptedException::class)
-    fun tcpForward(targetPort: Int): TcpForwardDescriptor {
-        val forwarder = TcpForwarder(this, targetPort)
-        val localPort = forwarder.start()
-
-        return TcpForwardDescriptor(forwarder, localPort)
+        return forwarder
     }
 
     companion object {
