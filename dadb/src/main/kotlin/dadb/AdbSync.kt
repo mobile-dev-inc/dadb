@@ -72,7 +72,7 @@ class AdbSyncStream(
 
     @Throws(IOException::class)
     fun recv(sink: Sink, remotePath: String) {
-        writePacket(RECV, remotePath.length)
+        writePacket(RECV, remotePath.toByteArray().size)
         stream.sink.apply {
             writeString(remotePath, StandardCharsets.UTF_8)
             flush()
