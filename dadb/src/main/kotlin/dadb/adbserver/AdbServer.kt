@@ -1,11 +1,13 @@
 package dadb.adbserver
 
+import dadb.AdbConnection
 import dadb.AdbStream
 import dadb.Dadb
 import okio.buffer
 import okio.sink
 import okio.source
 import java.io.*
+import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.charset.StandardCharsets
 
@@ -44,12 +46,14 @@ object AdbServer {
     fun createDadb(
         adbServerHost: String = "localhost",
         adbServerPort: Int = 5037,
-        deviceQuery: String = "host:transport-any"
+        deviceQuery: String = "host:transport-any",
+        connectTimeout: Int = 0,
+        socketTimeout: Int = 0
     ): Dadb {
         val name = deviceQuery
             .removePrefix("host:") // Use the device query without the host: prefix
             .removePrefix("transport:") // If it's a serial-number, just show that
-        return AdbServerDadb(adbServerHost, adbServerPort, deviceQuery, name)
+        return AdbServerDadb(adbServerHost, adbServerPort, deviceQuery, name, connectTimeout, socketTimeout)
     }
 
     /**
@@ -120,6 +124,8 @@ private class AdbServerDadb constructor(
     private val port: Int,
     private val deviceQuery: String,
     private val name: String,
+    private val connectTimeout: Int = 0,
+    private val socketTimeout: Int = 0,
 ) : Dadb {
 
     private val supportedFeatures: Set<String>
@@ -133,7 +139,12 @@ private class AdbServerDadb constructor(
 
     override fun open(destination: String): AdbStream {
         AdbBinary.ensureServerRunning(host, port)
-        val socket = Socket(host, port)
+
+        val socketAddress = InetSocketAddress(host, port)
+        val socket = Socket()
+        socket.soTimeout = socketTimeout
+        socket.connect(socketAddress, connectTimeout)
+
         AdbServer.send(socket, deviceQuery)
         AdbServer.send(socket, destination)
         return object : AdbStream {

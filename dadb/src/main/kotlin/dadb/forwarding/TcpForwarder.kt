@@ -17,16 +17,10 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.concurrent.thread
 
-data class TcpForwardDescriptor(private val resource: AutoCloseable, val localPort: Int): AutoCloseable {
-    override fun close() {
-        resource.close()
-    }
-}
-
 internal class TcpForwarder(
     private val dadb: Dadb,
+    private val hostPort: Int,
     private val targetPort: Int,
-    private val hostPort: Int? = null,
 ) : AutoCloseable {
 
     private var state: State = State.STOPPED
@@ -34,7 +28,7 @@ internal class TcpForwarder(
     private var server: ServerSocket? = null
     private var clientExecutor: ExecutorService? = null
 
-    fun start(): Int {
+    fun start() {
         check(state == State.STOPPED) { "Forwarder is already started at port $hostPort" }
 
         moveToState(State.STARTING)
@@ -55,12 +49,10 @@ internal class TcpForwarder(
         waitFor(10, 5000) {
             state == State.STARTED
         }
-
-        return server!!.localPort
     }
 
     private fun handleForwarding() {
-        val serverRef = ServerSocket(hostPort ?: 0)
+        val serverRef = ServerSocket(hostPort)
         server = serverRef
 
         moveToState(State.STARTED)
