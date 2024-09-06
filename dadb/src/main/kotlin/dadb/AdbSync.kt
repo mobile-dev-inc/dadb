@@ -45,7 +45,7 @@ class AdbSyncStream(
     @Throws(IOException::class)
     fun send(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
         val remote = "$remotePath,$mode"
-        writePacket(SEND, remote.length)
+        writePacket(SEND, remote.toByteArray().size)
 
         stream.sink.apply {
             writeString(remote, StandardCharsets.UTF_8)
@@ -72,7 +72,7 @@ class AdbSyncStream(
 
     @Throws(IOException::class)
     fun recv(sink: Sink, remotePath: String) {
-        writePacket(RECV, remotePath.length)
+        writePacket(RECV, remotePath.toByteArray().size)
         stream.sink.apply {
             writeString(remotePath, StandardCharsets.UTF_8)
             flush()

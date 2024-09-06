@@ -25,7 +25,6 @@ import org.junit.Rule
 import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
 import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.util.*
@@ -42,6 +41,8 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
 
     private val remotePath = "/data/local/tmp/hello"
 
+    private val remotePathWithCJK = "/data/local/tmp/你好こんにちは"
+
     @JvmField
     @Rule
     val temporaryFolder = TemporaryFolder()
@@ -57,6 +58,7 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
     internal fun tearDown() {
         localEmulator { dadb ->
             dadb.shell("rm -f $remotePath")
+            dadb.shell("rm -f $remotePathWithCJK")
         }
     }
 
@@ -166,6 +168,21 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
             val pulledContent = buffer.readByteArray()
 
             assertThat(pulledContent).hasLength(sizeMb * 1024 * 1024)
+        }
+    }
+
+    @Test
+    fun adbPush_pathWithCJK() {
+        localEmulator { dadb ->
+            val content = randomString()
+            val localSrcFile = temporaryFolder.newFile().apply { writeText(content) }
+
+            dadb.push(localSrcFile, remotePathWithCJK, 439, System.currentTimeMillis())
+
+            val localDstFile = temporaryFolder.newFile()
+            dadb.pull(localDstFile, remotePathWithCJK)
+
+            assertThat(localDstFile.readText()).isEqualTo(content)
         }
     }
 
