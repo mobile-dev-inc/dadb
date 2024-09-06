@@ -94,7 +94,7 @@ internal class AdbStreamImpl internal constructor(
             val bytesWritten = source.read(buffer.array(), buffer.position(), bytesToWrite)
 
             // Cast to prevent NoSuchMethodError when mixing Java versions
-            // Learn more: https://www.morling.dev/blog/bytebuffer-and-the-dreaded-nosuchmethoderror/
+            // Learn more: https://www.morling.dev/blog/bytebuffer-and-the-dreaded-nosuchmethoderror
             (buffer as java.nio.Buffer).position(buffer.position() + bytesWritten)
             if (buffer.remaining() == 0) flush()
 
@@ -103,6 +103,9 @@ internal class AdbStreamImpl internal constructor(
 
         override fun flush() {
             adbWriter.writeWrite(localId, remoteId, buffer.array(), 0, buffer.position())
+
+            // Cast to prevent NoSuchMethodError when mixing Java versions
+            // Learn more: https://www.morling.dev/blog/bytebuffer-and-the-dreaded-nosuchmethoderror
             (buffer as java.nio.Buffer).clear()
         }
 

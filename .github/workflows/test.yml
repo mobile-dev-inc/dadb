@@ -28,6 +28,7 @@ jobs:
     env:
       ANDROID_HOME: /home/runner/androidsdk
       ANDROID_SDK_ROOT: /home/runner/androidsdk
+      ANDROID_USER_HOME: /home/runner/.android
       ANDROID_OS_IMAGE: system-images;android-29;google_apis;x86_64
 
     steps:
@@ -78,8 +79,6 @@ jobs:
             --package "$ANDROID_OS_IMAGE" \
             --name "MyAVD"
 
-      - name: Configure AVD
-        run: |
           cat << EOF >> ~/.android/avd/MyAVD.avd/config.ini
           hw.cpu.ncore=2
           hw.gpu.enabled=yes
