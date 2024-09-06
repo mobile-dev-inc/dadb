@@ -103,7 +103,7 @@ internal class AdbStreamImpl internal constructor(
 
         override fun flush() {
             adbWriter.writeWrite(localId, remoteId, buffer.array(), 0, buffer.position())
-            buffer.clear()
+            (buffer as java.nio.Buffer).clear()
         }
 
         override fun close() {}
