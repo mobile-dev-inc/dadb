@@ -9,7 +9,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath(kotlin("gradle-plugin", "1.5.30"))
+        classpath(kotlin("gradle-plugin", "1.7.21"))
         classpath("com.vanniktech:gradle-maven-publish-plugin:0.17.0")
     }
 }
@@ -22,11 +22,13 @@ allprojects {
     tasks.withType(JavaCompile::class.java) {
         sourceCompatibility = "1.8"
         targetCompatibility = "1.8"
+        options.release.set(8)
     }
     tasks.withType(KotlinCompile::class.java) {
         kotlinOptions {
             jvmTarget = "1.8"
             freeCompilerArgs += "-Xopt-in=kotlin.ExperimentalUnsignedTypes"
+            freeCompilerArgs += "-Xjdk-release=1.8"
         }
     }
     tasks.withType(Task::class) {
