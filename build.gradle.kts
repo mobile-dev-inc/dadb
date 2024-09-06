@@ -9,7 +9,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath(kotlin("gradle-plugin", "1.5.30"))
+        classpath(kotlin("gradle-plugin", "1.8.22"))
         classpath("com.vanniktech:gradle-maven-publish-plugin:0.17.0")
     }
 }
