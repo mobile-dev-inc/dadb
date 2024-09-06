@@ -1,37 +1,113 @@
 name: Test
 
 on:
-  push:
-    branches: [ master ]
+  workflow_dispatch:
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
   test:
-    runs-on: macos-12
+    name: Test on Java ${{ matrix.java-version }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Android Command-line Tools versions depend on Java versions, so we need
+        # to specify exact versions.
+        # Learn more: https://stackoverflow.com/a/78890086/7009800
+        include:
+          - java-version: 8
+            android-clt-version: 9123335
+          - java-version: 11
+            android-clt-version: 9862592
+          - java-version: 17
+            android-clt-version: 11479570
+
+    env:
+      ANDROID_HOME: /home/runner/androidsdk
+      ANDROID_SDK_ROOT: /home/runner/androidsdk
+      ANDROID_USER_HOME: /home/runner/.android
+      ANDROID_OS_IMAGE: system-images;android-29;google_apis;x86_64
+
     steps:
-      - name: checkout
-        uses: actions/checkout@v3        
-      
-      - name: Gradle cache
-        uses: gradle/gradle-build-action@v2
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
 
-      - name: create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2.29.0
-        with:
-          api-level: 29
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
-          script: echo "Generated AVD snapshot for caching."
+      - name: Clone repository
+        uses: actions/checkout@v4
 
-      - name: run tests
-        uses: reactivecircus/android-emulator-runner@v2.29.0
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
-          api-level: 29
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          script: ./gradlew nativeTest
+          distribution: zulu
+          java-version: ${{ matrix.java-version }}
+          cache: gradle
+
+      - name: Set up bartekpacia/scripts (for install_android_sdk script)
+        run: |
+          git clone https://github.com/bartekpacia/scripts.git $HOME/scripts
+          echo "$HOME/scripts/bin" >> $GITHUB_PATH
+
+      - name: Set up android-wait-for-emulator script
+        run: |
+          curl -fsSl -O https://raw.githubusercontent.com/travis-ci/travis-cookbooks/master/community-cookbooks/android-sdk/files/default/android-wait-for-emulator
+          chmod +x ./android-wait-for-emulator
+          mv ./android-wait-for-emulator $HOME/scripts/bin
+
+      - name: Set up Android Command-line Tools
+        run: |
+          install_android_sdk https://dl.google.com/android/repository/commandlinetools-linux-${{ matrix.android-clt-version }}_latest.zip
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin:$PATH" >> $GITHUB_PATH
+
+      - name: Set up Android SDK components
+        run: |
+          yes | sdkmanager --install emulator
+          echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
+          yes | sdkmanager --install "platform-tools"
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          yes | sdkmanager --install "platforms;android-29"
+          yes | sdkmanager --install "$ANDROID_OS_IMAGE"
+
+      - name: Create AVD
+        run: |
+          avdmanager -s create avd \
+            --package "$ANDROID_OS_IMAGE" \
+            --name "MyAVD"
+
+          cat << EOF >> ~/.android/avd/MyAVD.avd/config.ini
+          hw.cpu.ncore=2
+          hw.gpu.enabled=yes
+          hw.gpu.mode=swiftshader_indirect
+          hw.ramSize=3072
+          disk.dataPartition.size=4G
+          vm.heapSize=576
+          hw.lcd.density=440
+          hw.lcd.height=2220
+          hw.lcd.width=1080
+          EOF
+
+      - name: Run AVD
+        run: |
+          emulator @MyAVD \
+            -verbose -no-snapshot-save -no-window -noaudio -no-boot-anim -accel on -camera-back none -gpu swiftshader_indirect \
+            >~/emulator_stdout.log \
+            2>~/emulator_stderr.log &
+
+      - name: Wait for AVD to start up
+        run: |
+          android-wait-for-emulator
+
+          # This is also a prerequiste
+          while true; do
+            adb shell service list | grep 'package' && echo 'service "package" is active!' && break
+            echo 'waiting for service "package" to start'
+            sleep 1
+          done
+
+      - name: Run tests
+        run: ./gradlew nativeTest

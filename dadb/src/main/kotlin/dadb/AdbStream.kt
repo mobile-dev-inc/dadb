@@ -93,7 +93,9 @@ internal class AdbStreamImpl internal constructor(
             val bytesToWrite = min(buffer.remaining(), byteCount.toInt())
             val bytesWritten = source.read(buffer.array(), buffer.position(), bytesToWrite)
 
-            buffer.position(buffer.position() + bytesWritten)
+            // Cast to prevent NoSuchMethodError when mixing Java versions
+            // Learn more: https://www.morling.dev/blog/bytebuffer-and-the-dreaded-nosuchmethoderror
+            (buffer as java.nio.Buffer).position(buffer.position() + bytesWritten)
             if (buffer.remaining() == 0) flush()
 
             return bytesWritten
@@ -101,7 +103,10 @@ internal class AdbStreamImpl internal constructor(
 
         override fun flush() {
             adbWriter.writeWrite(localId, remoteId, buffer.array(), 0, buffer.position())
-            buffer.clear()
+
+            // Cast to prevent NoSuchMethodError when mixing Java versions
+            // Learn more: https://www.morling.dev/blog/bytebuffer-and-the-dreaded-nosuchmethoderror
+            (buffer as java.nio.Buffer).clear()
         }
 
         override fun close() {}
