@@ -78,6 +78,8 @@ jobs:
             --package "$ANDROID_OS_IMAGE" \
             --name "MyAVD"
 
+      - name: Configure AVD
+        run: |
           cat << EOF >> ~/.android/avd/MyAVD.avd/config.ini
           hw.cpu.ncore=2
           hw.gpu.enabled=yes
