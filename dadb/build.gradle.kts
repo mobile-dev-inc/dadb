@@ -31,6 +31,7 @@ val metadataDetector = objects.newInstance(DefaultJvmMetadataDetector::class.jav
 
 graal {
     graalVersion("21.0.0.2")
+    javaVersion("8")
 }
 
 tasks.test {
