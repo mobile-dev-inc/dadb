@@ -131,7 +131,7 @@ private class AdbServerDadb constructor(
     private val supportedFeatures: Set<String>
 
     init {
-        supportedFeatures = open("host:features").use {
+        supportedFeatures = open("host-serial:$name:features").use {
             val features = AdbServer.readString(DataInputStream(it.source.inputStream()))
             features.split(",").toSet()
         }
