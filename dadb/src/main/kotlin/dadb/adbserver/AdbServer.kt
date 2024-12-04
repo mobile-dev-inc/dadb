@@ -51,7 +51,7 @@ object AdbServer {
         socketTimeout: Int = 0
     ): Dadb {
          if (deviceQuery.startsWith("first:")) {
-            val filter = Regex("^${deviceQuery.removePrefix("first:")}")
+            val filter = Regex(deviceQuery.removePrefix("first:"))
             return listDadbs(adbServerHost, adbServerPort).first {
                 it is AdbServerDadb && it.name.contains(filter)
             }
