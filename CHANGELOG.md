@@ -1,5 +1,18 @@
 # Changelog
 
+### 1.2.9
+
+* Various fixes for Windows
+
+### 1.2.8
+
+* Allow streaming apk install
+* Add timeout option when create Dadb
+
+### 1.2.7
+
+* Fix for install on physical devices
+
 ### 1.2.6
 
 * When generating adb keys, ensure that parent directories are created if needed
