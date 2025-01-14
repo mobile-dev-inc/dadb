@@ -70,8 +70,8 @@ class AdbKeyPair(
 
         @JvmStatic
         fun readDefault(): AdbKeyPair {
-            val privateKeyFile = File(System.getenv("HOME"), ".android/adbkey")
-            val publicKeyFile = File(System.getenv("HOME"), ".android/adbkey.pub")
+            val privateKeyFile = File(System.getProperty("user.home"), ".android/adbkey")
+            val publicKeyFile = File(System.getProperty("user.home"), ".android/adbkey.pub")
 
             if (!privateKeyFile.exists()) {
                 generate(privateKeyFile, publicKeyFile)

@@ -28,7 +28,7 @@ internal object PKCS8 {
     private const val SUFFIX = "-----END PRIVATE KEY-----"
 
     fun parse(bytes: ByteArray): PrivateKey {
-        val string = String(bytes).replace(PREFIX, "").replace(SUFFIX, "").replace("\n", "")
+        val string = String(bytes).replace(PREFIX, "").replace(SUFFIX, "").replace(Regex("\\s+"), "")
         val encoded = Base64.getDecoder().decode(string)
         val keyFactory = KeyFactory.getInstance("RSA")
         val keySpec = PKCS8EncodedKeySpec(encoded)
