@@ -20,7 +20,6 @@ package dadb
 import dadb.adbserver.AdbServer
 import dadb.forwarding.TcpForwarder
 import java.io.File
-import java.io.InputStream
 import java.nio.file.Files
 import okio.*
 
@@ -254,22 +253,22 @@ interface Dadb : AutoCloseable {
 
         @JvmStatic
         @JvmOverloads
-        fun create(host: String, port: Int, keyPair: AdbKeyPair? = AdbKeyPair.readDefault(), connectTimeout: Int = 0, socketTimeout: Int = 0): Dadb = DadbImpl(host, port, keyPair, connectTimeout, socketTimeout)
+        fun create(host: String, port: Int, keyPair: AdbKeyPair? = AdbKeyPair.readDefault(), connectTimeout: Int = 0, socketTimeout: Int = 0, keepAlive: Boolean = false): Dadb = DadbImpl(host, port, keyPair, connectTimeout, socketTimeout, keepAlive = keepAlive)
 
         @JvmStatic
         @JvmOverloads
-        fun discover(host: String = "localhost", keyPair: AdbKeyPair? = AdbKeyPair.readDefault(), connectTimeout: Int = 0, socketTimeout: Int = 0): Dadb? {
-            return list(host, keyPair, connectTimeout, socketTimeout).firstOrNull()
+        fun discover(host: String = "localhost", keyPair: AdbKeyPair? = AdbKeyPair.readDefault(), connectTimeout: Int = 0, socketTimeout: Int = 0, keepAlive: Boolean = false): Dadb? {
+            return list(host, keyPair, connectTimeout, socketTimeout, keepAlive).firstOrNull()
         }
 
         @JvmStatic
         @JvmOverloads
-        fun list(host: String = "localhost", keyPair: AdbKeyPair? = AdbKeyPair.readDefault(), connectTimeout: Int = 0, socketTimeout: Int = 0): List<Dadb> {
+        fun list(host: String = "localhost", keyPair: AdbKeyPair? = AdbKeyPair.readDefault(), connectTimeout: Int = 0, socketTimeout: Int = 0, keepAlive: Boolean = false): List<Dadb> {
             val dadbs = AdbServer.listDadbs(adbServerHost = host)
             if (dadbs.isNotEmpty()) return dadbs
 
             return (MIN_EMULATOR_PORT .. MAX_EMULATOR_PORT).mapNotNull { port ->
-                val dadb = create(host, port, keyPair, socketTimeout, connectTimeout)
+                val dadb = create(host, port, keyPair, socketTimeout, connectTimeout, keepAlive = keepAlive)
                 val response = try {
                     dadb.shell("echo success").allOutput
                 } catch (ignore : Throwable) {
