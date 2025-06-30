@@ -28,7 +28,8 @@ internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
         private val port: Int,
         private val keyPair: AdbKeyPair? = null,
         private val connectTimeout: Int = 0,
-        private val socketTimeout: Int = 0
+        private val socketTimeout: Int = 0,
+        private val keepAlive: Boolean = false,
 ) : Dadb {
 
     init {
@@ -81,6 +82,9 @@ internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
         val socket = Socket()
         socket.soTimeout = socketTimeout
         socket.connect(socketAddress, connectTimeout)
+        if (keepAlive) {
+            socket.keepAlive = true
+        }
         val adbConnection = AdbConnection.connect(socket, keyPair)
         return adbConnection to socket
     }
