@@ -1,5 +1,9 @@
 # Changelog
 
+### 1.2.10
+
+* Creating configuration for enabling keep alive on dadb socket
+
 ### 1.2.9
 
 * Various fixes for Windows
