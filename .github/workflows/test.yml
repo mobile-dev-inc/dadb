@@ -18,8 +18,6 @@ jobs:
         # to specify exact versions.
         # Learn more: https://stackoverflow.com/a/78890086/7009800
         include:
-          - java-version: 8
-            android-clt-version: 9123335
           - java-version: 11
             android-clt-version: 9862592
           - java-version: 17
@@ -110,4 +108,4 @@ jobs:
           done
 
       - name: Run tests
-        run: ./gradlew nativeTest
+        run: ./gradlew test
