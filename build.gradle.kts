@@ -18,12 +18,12 @@ plugins {
 
 allprojects {
     tasks.withType(JavaCompile::class.java) {
-        sourceCompatibility = "1.8"
-        targetCompatibility = "1.8"
+        sourceCompatibility = JavaVersion.VERSION_11.toString()
+        targetCompatibility = JavaVersion.VERSION_11.toString()
     }
     tasks.withType(KotlinCompile::class.java) {
         kotlinOptions {
-            jvmTarget = "1.8"
+            jvmTarget = JavaVersion.VERSION_11.toString()
             freeCompilerArgs += "-Xopt-in=kotlin.ExperimentalUnsignedTypes"
         }
     }
