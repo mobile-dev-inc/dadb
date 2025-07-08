@@ -25,3 +25,7 @@ val metadataDetector = objects.newInstance(DefaultJvmMetadataDetector::class.jav
 tasks.test {
     useJUnitPlatform()
 }
+
+mavenPublishing {
+    publishToMavenCentral(true)
+}
