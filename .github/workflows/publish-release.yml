@@ -37,3 +37,5 @@ jobs:
         env:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: xiCjWc+s
+          ORG_GRADLE_PROJECT_mavenCentralPassword: NaceplQ9VejQObItzlw6P5Tc4aQcR5xNmmUgJrCj9r7a
