@@ -1,6 +1,7 @@
 name: Publish Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*'
@@ -30,13 +31,9 @@ jobs:
         run: |
           echo "VERSION_NAME=$(cat gradle.properties | grep -w "VERSION_NAME" | cut -d'=' -f2)" >> $GITHUB_ENV
 
-      - name: Upload release
-        run: ./gradlew publishAllPublicationsToMavenCentralRepository --no-daemon --no-parallel
+      - name: Upload and Publish artifacts
+        run: ./gradlew publishToMavenCentral --no-configuration-cache
         if: ${{ !endsWith(env.VERSION_NAME, '-SNAPSHOT') }}
         env:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
-
-      - name: Publish release
-        run: ./gradlew closeAndReleaseRepository --no-daemon --no-parallel
-        if: ${{ !endsWith(env.VERSION_NAME, '-SNAPSHOT') }}
