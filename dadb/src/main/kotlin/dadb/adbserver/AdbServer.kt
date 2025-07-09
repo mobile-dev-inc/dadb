@@ -50,6 +50,12 @@ object AdbServer {
         connectTimeout: Int = 0,
         socketTimeout: Int = 0
     ): Dadb {
+         if (deviceQuery.startsWith("first:")) {
+            val filter = Regex(deviceQuery.removePrefix("first:"))
+            return listDadbs(adbServerHost, adbServerPort).first {
+                it is AdbServerDadb && it.name.contains(filter)
+            }
+        }
         val name = deviceQuery
             .removePrefix("host:") // Use the device query without the host: prefix
             .removePrefix("transport:") // If it's a serial-number, just show that
@@ -123,7 +129,7 @@ private class AdbServerDadb constructor(
     private val host: String,
     private val port: Int,
     private val deviceQuery: String,
-    private val name: String,
+    val name: String,
     private val connectTimeout: Int = 0,
     private val socketTimeout: Int = 0,
 ) : Dadb {
@@ -131,7 +137,7 @@ private class AdbServerDadb constructor(
     private val supportedFeatures: Set<String>
 
     init {
-        supportedFeatures = open("host:features").use {
+        supportedFeatures = open("host-serial:$name:features").use {
             val features = AdbServer.readString(DataInputStream(it.source.inputStream()))
             features.split(",").toSet()
         }
