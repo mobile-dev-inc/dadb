@@ -22,7 +22,6 @@ import okio.Source
 import okio.sink
 import okio.source
 import org.jetbrains.annotations.TestOnly
-import java.io.Closeable
 import java.io.IOException
 import java.net.Socket
 import java.util.*
@@ -30,7 +29,7 @@ import java.util.*
 internal class AdbConnection internal constructor(
         adbReader: AdbReader,
         private val adbWriter: AdbWriter,
-        private val closeable: Closeable?,
+        private val closeable: AutoCloseable?,
         private val supportedFeatures: Set<String>,
         private val version: Int,
         private val maxPayloadSize: Int
@@ -83,7 +82,11 @@ internal class AdbConnection internal constructor(
             return connect(source, sink, keyPair, socket)
         }
 
-        private fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null, closeable: Closeable? = null): AdbConnection {
+        fun connect(transport: AdbTransport, keyPair: AdbKeyPair? = null): AdbConnection {
+            return connect(transport.source, transport.sink, keyPair, closeable = transport)
+        }
+
+        private fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null, closeable: AutoCloseable? = null): AdbConnection {
             val adbReader = AdbReader(source)
             val adbWriter = AdbWriter(sink)
 
@@ -96,7 +99,7 @@ internal class AdbConnection internal constructor(
             }
         }
 
-        private fun connect(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair?, closeable: Closeable?): AdbConnection {
+        private fun connect(adbReader: AdbReader, adbWriter: AdbWriter, keyPair: AdbKeyPair?, closeable: AutoCloseable?): AdbConnection {
             adbWriter.writeConnect()
 
             var message = adbReader.readMessage()

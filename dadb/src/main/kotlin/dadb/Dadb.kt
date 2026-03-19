@@ -257,6 +257,10 @@ interface Dadb : AutoCloseable {
 
         @JvmStatic
         @JvmOverloads
+        fun create(transportFactory: AdbTransportFactory, keyPair: AdbKeyPair? = AdbKeyPair.readDefault()): Dadb = DadbImpl(transportFactory = transportFactory, keyPair = keyPair)
+
+        @JvmStatic
+        @JvmOverloads
         fun discover(host: String = "localhost", keyPair: AdbKeyPair? = AdbKeyPair.readDefault(), connectTimeout: Int = 0, socketTimeout: Int = 0, keepAlive: Boolean = false): Dadb? {
             return list(host, keyPair, connectTimeout, socketTimeout, keepAlive).firstOrNull()
         }

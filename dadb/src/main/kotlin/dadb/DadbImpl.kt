@@ -17,6 +17,8 @@
 
 package dadb
 
+import okio.sink
+import okio.source
 import org.jetbrains.annotations.TestOnly
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -24,16 +26,32 @@ import kotlin.jvm.Throws
 
 
 internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
-        private val host: String,
-        private val port: Int,
+        private val description: String,
+        private val transportFactory: AdbTransportFactory,
         private val keyPair: AdbKeyPair? = null,
-        private val connectTimeout: Int = 0,
-        private val socketTimeout: Int = 0,
-        private val keepAlive: Boolean = false,
 ) : Dadb {
 
-    init {
+    internal constructor(
+        transportFactory: AdbTransportFactory,
+        keyPair: AdbKeyPair? = null,
+    ) : this(
+        description = transportFactory.description,
+        transportFactory = transportFactory,
+        keyPair = keyPair,
+    )
 
+    internal constructor(
+        host: String,
+        port: Int,
+        keyPair: AdbKeyPair? = null,
+        connectTimeout: Int = 0,
+        socketTimeout: Int = 0,
+        keepAlive: Boolean = false,
+    ) : this(
+        description = "$host:$port",
+        transportFactory = SocketAdbTransportFactory(host, port, connectTimeout, socketTimeout, keepAlive),
+        keyPair = keyPair,
+    ) {
         if (port < 0) {
             throw IllegalArgumentException("port must be >= 0")
         }
@@ -45,11 +63,9 @@ internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
         if (socketTimeout < 0) {
             throw IllegalArgumentException("socketTimeout must be >= 0")
         }
-
     }
 
-
-    private var connection: Pair<AdbConnection, Socket>? = null
+    private var connection: Pair<AdbConnection, AdbTransport>? = null
 
     override fun open(destination: String) = connection().open(destination)
 
@@ -60,7 +76,7 @@ internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
     override fun close() {
         connection?.first?.close()
     }
-    override fun toString() = "$host:$port"
+    override fun toString() = description
 
     @TestOnly
     fun closeConnection() {
@@ -77,15 +93,45 @@ internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
         return connection.first
     }
 
-    private fun newConnection(): Pair<AdbConnection, Socket> {
-        val socketAddress = InetSocketAddress(host, port)
-        val socket = Socket()
-        socket.soTimeout = socketTimeout
-        socket.connect(socketAddress, connectTimeout)
-        if (keepAlive) {
-            socket.keepAlive = true
-        }
-        val adbConnection = AdbConnection.connect(socket, keyPair)
-        return adbConnection to socket
+    private fun newConnection(): Pair<AdbConnection, AdbTransport> {
+        val transport = transportFactory.connect()
+        val adbConnection = AdbConnection.connect(transport, keyPair)
+        return adbConnection to transport
     }
+
+    private class SocketAdbTransportFactory(
+        private val host: String,
+        private val port: Int,
+        private val connectTimeout: Int,
+        private val socketTimeout: Int,
+        private val keepAlive: Boolean,
+    ) : AdbTransportFactory {
+        override val description: String = "$host:$port"
+
+        override fun connect(): AdbTransport {
+            val socketAddress = InetSocketAddress(host, port)
+            val socket = Socket()
+            socket.soTimeout = socketTimeout
+            socket.connect(socketAddress, connectTimeout)
+            if (keepAlive) {
+                socket.keepAlive = true
+            }
+            return SocketAdbTransport(socket, description)
+        }
+    }
+
+    private class SocketAdbTransport(
+        private val socket: Socket,
+        override val description: String,
+    ) : AdbTransport {
+        override val source = socket.source()
+        override val sink = socket.sink()
+        override val isClosed: Boolean
+            get() = socket.isClosed
+
+        override fun close() {
+            socket.close()
+        }
+    }
+
 }

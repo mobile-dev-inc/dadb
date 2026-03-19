@@ -26,6 +26,29 @@ Dadb.create("localhost", 5555).use { dadb ->
 
 *Note: Connect to the odd adb daemon port (5555), not the even emulator console port (5554)*
 
+### Custom Transports
+
+If your ADB packets do not travel over a regular TCP socket, you can supply a custom
+transport factory. This is useful for Android USB host integrations, tunnels, or embedded
+bridges that already expose bidirectional byte streams.
+
+```kotlin
+val dadb = Dadb.create(
+    transportFactory = AdbTransportFactory {
+        object : AdbTransport {
+            override val source = mySource
+            override val sink = mySink
+            override val isClosed = false
+
+            override fun close() {
+                closeMyTransport()
+            }
+        }
+    },
+    keyPair = AdbKeyPair.readDefault(),
+)
+```
+
 ### Discover a Device
 
 The following discovers and returns a connected device or emulator. If there are multiple it returns the first one found.

@@ -18,6 +18,9 @@
 package dadb
 
 import com.google.common.truth.Truth
+import okio.sink
+import okio.source
+import java.net.Socket
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Ignore
@@ -44,6 +47,36 @@ internal class DadbImplTest {
         dadb.closeConnection()
 
         assertShellResponse(dadb.shell("echo hello2"), 0, "hello2\n")
+    }
+
+    @Test
+    fun customTransportReconnection() {
+        val customDadb =
+            Dadb.create(
+                transportFactory =
+                    AdbTransportFactory {
+                        val socket = Socket("localhost", 5555)
+                        object : AdbTransport {
+                            override val source = socket.source()
+                            override val sink = socket.sink()
+                            override val isClosed: Boolean
+                                get() = socket.isClosed
+
+                            override val description: String = "localhost:5555"
+
+                            override fun close() {
+                                socket.close()
+                            }
+                        }
+                    },
+                keyPair = AdbKeyPair.readDefault(),
+            ) as DadbImpl
+
+        customDadb.use {
+            assertShellResponse(it.shell("echo hello1"), 0, "hello1\n")
+            it.closeConnection()
+            assertShellResponse(it.shell("echo hello2"), 0, "hello2\n")
+        }
     }
 
     @Ignore
