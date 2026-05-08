@@ -72,17 +72,24 @@ object AdbServer {
             send(socket, "host:devices")
             readString(DataInputStream(socket.getInputStream()))
         }
+        // Filter the `host:devices` output to entries in `device` state only —
+        // unauthorized/offline lines have a serial but no usable transport, so
+        // calling createDadb on them throws and (without per-entry isolation)
+        // collapses the whole returned list. Wrap each createDadb call in
+        // runCatching so a single failing entry can't kill the rest.
+        // Fixes #55 and #62.
         return output.lines()
             .filter { it.isNotBlank() }
-            .mapNotNull {
-                val parts = it.split("\t")
-                if (parts.size != 2) {
-                    null
-                } else {
-                    parts[0]
-                }
+            .mapNotNull { line ->
+                val parts = line.split("\t")
+                if (parts.size != 2) return@mapNotNull null
+                val serial = parts[0]
+                val state = parts[1]
+                if (state != "device") return@mapNotNull null
+                runCatching {
+                    createDadb(adbServerHost, adbServerPort, "host:transport:$serial")
+                }.getOrNull()
             }
-            .map { createDadb(adbServerHost, adbServerPort, "host:transport:${it}") }
     }
 
     internal fun readString(inputStream: DataInputStream): String {
@@ -128,10 +135,14 @@ private class AdbServerDadb constructor(
     private val socketTimeout: Int = 0,
 ) : Dadb {
 
-    private val supportedFeatures: Set<String>
-
-    init {
-        supportedFeatures = open("host:features").use {
+    // Lazy initialization so that constructing an AdbServerDadb does not
+    // eagerly trigger a `host:features` query. The eager query throws for
+    // devices that are unauthorized/offline at construction time, which can
+    // happen during `listDadbs` enumeration on a host with an unauthorized
+    // neighbor. Defers the failure to first actual use of supportedFeatures.
+    // See #55.
+    private val supportedFeatures: Set<String> by lazy {
+        open("host:features").use {
             val features = AdbServer.readString(DataInputStream(it.source.inputStream()))
             features.split(",").toSet()
         }
