@@ -268,7 +268,7 @@ interface Dadb : AutoCloseable {
             if (dadbs.isNotEmpty()) return dadbs
 
             return (MIN_EMULATOR_PORT .. MAX_EMULATOR_PORT).mapNotNull { port ->
-                val dadb = create(host, port, keyPair, socketTimeout, connectTimeout, keepAlive = keepAlive)
+                val dadb = create(host, port, keyPair, connectTimeout, socketTimeout, keepAlive = keepAlive)
                 val response = try {
                     dadb.shell("echo success").allOutput
                 } catch (ignore : Throwable) {
