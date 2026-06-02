@@ -17,141 +17,145 @@
 
 package dadb
 
-import java.net.SocketTimeoutException
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
+import com.google.common.truth.Truth.assertThat
+import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
 import org.junit.jupiter.api.Test
-import kotlin.test.assertTrue
-import kotlin.test.fail
+import org.junit.jupiter.api.assertThrows
+import java.io.Closeable
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
+import java.net.SocketTimeoutException
+import java.time.Duration
+import java.util.Collections
+import kotlin.concurrent.thread
 
 /**
- * FULL-STACK test for the wedged-adbd write hang and its fix. No mocks: a real [Dadb] talks to a
- * real adbd on localhost:5555. The wedge is induced exactly as the production incident: freeze
- * adbd mid-operation (SIGSTOP the emulator process) so the socket stops draining.
+ * Tests that a wedged adb connection fails fast instead of hanging forever.
  *
- * Background:
- *   - SO_TIMEOUT (Socket.setSoTimeout, exposed as Dadb.create(socketTimeout=)) bounds READS only.
- *   - Every shell/pull/push starts with an OPEN write, and pushes/installs stream WRITE messages;
- *     none of those had a deadline, so a wedged adbd made the write block forever (burning
- *     Maestro's 15-minute watchdog and surfacing as a non-retryable customer error).
+ * `Socket.setSoTimeout` (Dadb's `socketTimeout`) bounds READS only. Writes — the OPEN that begins
+ * every shell/pull/push, plus streamed WRITE payloads — are bounded separately by okio's socket
+ * sink timeout (see [AdbConnection.WRITE_TIMEOUT_MILLIS]).
  *
- * The fix always bounds writes with a fixed internal deadline ([AdbConnection.WRITE_TIMEOUT_MILLIS])
- * applied to okio's socket sink timeout. okio chunks each write at TIMEOUT_WRITE_SIZE and arms its
- * SocketAsyncTimeout per chunk; on expiry SocketAsyncTimeout.timedOut() closes the socket and the
- * write throws SocketTimeoutException. Closing the socket also invalidates the connection, so
- * DadbImpl rebuilds it on the next op. It is a correctness guard, not a tunable.
+ * Both directions are exercised against a REAL emulator (adb port 5555); the wedge is injected
+ * deterministically and portably, with no process freezing:
+ *  - WRITE: route dadb through a transparent TCP [Relay] to real adbd, then stop draining the client
+ *    side. Real adbd would buffer hundreds of MB, but a relay that stops reading lets only the OS
+ *    socket buffers absorb the write before it blocks — so the write deadline fires deterministically.
+ *  - READ: run a command that produces no output (`sleep`); the read blocks until SO_TIMEOUT fires.
  *
- * Requires: a booted emulator on console port 5554 / adb port 5555.
+ * Requires a booted emulator on adb port 5555.
  */
 class WriteTimeoutTest {
 
-    private sealed class Outcome {
-        object Completed : Outcome()
-        object Hung : Outcome()
-        data class Threw(val cause: Throwable?) : Outcome()
-    }
-
-    private fun emulatorPid(): String =
-        ProcessBuilder("pgrep", "-f", "qemu-system.*-port 5554")
-            .start().inputStream.bufferedReader().readText().trim().lines().first().trim()
-
-    private fun signal(pid: String, sig: String) {
-        ProcessBuilder("kill", sig, pid).start().waitFor()
-    }
-
-    /** Runs [op] on a daemon thread, capping the wait at [capSeconds] so a real hang can't stall CI. */
-    private fun runBounded(capSeconds: Long, op: () -> Unit): Pair<Outcome, Long> {
-        val exec = Executors.newSingleThreadExecutor { r -> Thread(r, "dadb-op").apply { isDaemon = true } }
-        val start = System.currentTimeMillis()
-        val f: Future<*> = exec.submit(op)
-        val outcome = try {
-            f.get(capSeconds, TimeUnit.SECONDS); Outcome.Completed
-        } catch (e: TimeoutException) {
-            Outcome.Hung
-        } catch (e: java.util.concurrent.ExecutionException) {
-            Outcome.Threw(e.cause)
-        } finally {
-            f.cancel(true); exec.shutdownNow()
-        }
-        return outcome to (System.currentTimeMillis() - start)
-    }
-
     /**
-     * FIX: with adbd frozen, a shell op whose 32MB OPEN write fills the TCP buffers must fail fast
-     * with a SocketTimeoutException, bounded by the internal write deadline well under the watchdog.
-     * Before the fix this hangs (socketTimeout covers reads only). The cap is generous vs the write
-     * deadline so a failure to bound is observable as a Hung outcome, not just a slow pass.
+     * Transparent byte relay: dadb <-> [Relay] <-> real adbd. Forwards both directions untouched
+     * (so the real ADB handshake/protocol run against real adbd); pausing the client->target pump
+     * wedges writes. Accepts repeatedly so a connection can be rebuilt after a timeout closes it.
      */
-    @Test
-    fun wedgedWrite_isBoundedByWriteTimeout() {
-        val pid = emulatorPid()
-        val writeBudgetMs = AdbConnection.WRITE_TIMEOUT_MILLIS
-        val dadb = Dadb.create("localhost", 5555, connectTimeout = 3000, socketTimeout = 2000)
-        try {
-            val warmup = dadb.shell("echo warmup").allOutput.trim()
-            println("[WRITE] warmup over real adbd -> '$warmup'")
+    private class Relay(private val targetPort: Int) : Closeable {
+        private val server = ServerSocket().apply { bind(InetSocketAddress("localhost", 0)) }
+        val port: Int get() = server.localPort
 
-            signal(pid, "-STOP") // wedge: real adbd stops servicing the socket
-            val bigCommand = "x".repeat(32 * 1024 * 1024) // 32MB OPEN payload fills TCP buffers
-            val capSeconds = (writeBudgetMs / 1000) + 10 // generous headroom so a true hang reads as Hung
-            val (outcome, ms) = runBounded(capSeconds) { dadb.shell(bigCommand) }
-            println("[WRITE] internal writeTimeout=${writeBudgetMs}ms, adbd FROZEN -> $outcome after ${ms}ms")
+        @Volatile private var forwardClientToTarget = true
+        @Volatile private var forwardTargetToClient = true
+        private val openSockets = Collections.synchronizedList(mutableListOf<Socket>())
 
-            when (outcome) {
-                is Outcome.Hung -> fail("Write hung past the cap — internal write deadline not enforced")
-                is Outcome.Completed -> fail("Write completed unexpectedly against a frozen adbd")
-                is Outcome.Threw -> {
-                    val cause = outcome.cause
-                    assertTrue(
-                        cause is SocketTimeoutException,
-                        "Expected SocketTimeoutException from the bounded write, got ${cause?.javaClass?.name}: ${cause?.message}"
-                    )
-                    // Bounded near the internal deadline (allow scheduling slack), far below the cap.
-                    assertTrue(
-                        ms < writeBudgetMs + 5000L,
-                        "Write should be bounded near ${writeBudgetMs}ms, took ${ms}ms"
-                    )
+        init {
+            thread(isDaemon = true, name = "relay-accept") {
+                while (!server.isClosed) {
+                    val client = try { server.accept() } catch (e: Throwable) { break }
+                    val target = try { Socket("localhost", targetPort) } catch (e: Throwable) {
+                        runCatching { client.close() }; continue
+                    }
+                    openSockets.add(client); openSockets.add(target)
+                    // client -> target: pausing it wedges dadb's writes (the peer stops draining).
+                    pump(client, target) { forwardClientToTarget }
+                    // target -> client: pausing it wedges dadb's reads (responses never arrive, but
+                    // the connection stays open, so SO_TIMEOUT fires rather than hitting EOF).
+                    pump(target, client) { forwardTargetToClient }
                 }
             }
+        }
 
-            // Connection self-heals: the timed-out socket was closed, so the next op rebuilds it.
-            signal(pid, "-CONT")
-            val recovered = dadb.shell("echo recovered").allOutput.trim()
-            println("[WRITE] recovered after rebuild -> '$recovered'")
-            assertTrue(recovered == "recovered", "Expected connection to rebuild after timeout, got '$recovered'")
-        } finally {
-            signal(pid, "-CONT")
-            try { dadb.close() } catch (ignore: Throwable) {}
+        private fun pump(from: Socket, to: Socket, enabled: () -> Boolean) {
+            thread(isDaemon = true, name = "relay-pump") {
+                val buf = ByteArray(16 * 1024)
+                try {
+                    val input = from.getInputStream()
+                    val output = to.getOutputStream()
+                    while (true) {
+                        while (!enabled()) Thread.sleep(20) // don't start a read while paused
+                        val n = input.read(buf)
+                        if (n < 0) break
+                        while (!enabled()) Thread.sleep(20) // don't forward a read that landed during a pause
+                        output.write(buf, 0, n)
+                        output.flush()
+                    }
+                } catch (ignore: Throwable) {
+                }
+            }
+        }
+
+        fun wedgeWrites() { forwardClientToTarget = false }
+        fun unwedgeWrites() { forwardClientToTarget = true }
+        fun wedgeReads() { forwardTargetToClient = false }
+
+        override fun close() {
+            runCatching { server.close() }
+            synchronized(openSockets) { openSockets.forEach { runCatching { it.close() } } }
         }
     }
 
-    /**
-     * CONTROL: with adbd frozen, a small shell read is still bounded by SO_TIMEOUT and throws
-     * SocketTimeoutException within socketTimeout. Proves the read path is unchanged by the fix.
-     */
     @Test
-    fun wedgedRead_isBoundedBySocketTimeout() {
-        val pid = emulatorPid()
-        val socketTimeout = 2000
-        val dadb = Dadb.create("localhost", 5555, connectTimeout = 3000, socketTimeout = socketTimeout)
-        try {
-            val warmup = dadb.shell("echo warmup").allOutput.trim()
-            println("[READ ] warmup over real adbd -> '$warmup'")
-
-            signal(pid, "-STOP")
-            val (outcome, ms) = runBounded(capSeconds = 8) { dadb.shell("echo hi") }
-            println("[READ ] socketTimeout=${socketTimeout}ms, adbd FROZEN -> $outcome after ${ms}ms")
-
-            assertTrue(
-                outcome is Outcome.Threw && outcome.cause is SocketTimeoutException,
-                "Expected SocketTimeoutException from the bounded read, got $outcome"
+    fun `a wedged write fails fast with SocketTimeoutException and the connection recovers`() {
+        Relay(targetPort = 5555).use { relay ->
+            // writeTimeoutMillis is the internal test seam; production always uses WRITE_TIMEOUT_MILLIS.
+            val dadb = DadbImpl(
+                host = "localhost",
+                port = relay.port,
+                keyPair = AdbKeyPair.readDefault(),
+                connectTimeout = 5000,
+                socketTimeout = 5000,
+                writeTimeoutMillis = 1000,
             )
-            assertTrue(ms < 2L * socketTimeout, "Read should be bounded under ${2 * socketTimeout}ms, took ${ms}ms")
-        } finally {
-            signal(pid, "-CONT")
-            try { dadb.close() } catch (ignore: Throwable) {}
+            try {
+                // Real handshake + op, through the relay, against real adbd.
+                assertThat(dadb.shell("echo warmup").allOutput.trim()).isEqualTo("warmup")
+
+                // Wedge: relay stops draining the client side, so a large write stalls.
+                relay.wedgeWrites()
+                val bigCommand = "x".repeat(32 * 1024 * 1024) // overflows the OS socket buffers (incl. larger Linux defaults)
+                assertThrows<SocketTimeoutException> {
+                    assertTimeoutPreemptively(Duration.ofSeconds(8)) { dadb.shell(bigCommand) }
+                }
+
+                // The timed-out write closed the socket; once forwarding resumes, the next op rebuilds.
+                relay.unwedgeWrites()
+                assertThat(dadb.shell("echo recovered").allOutput.trim()).isEqualTo("recovered")
+            } finally {
+                runCatching { dadb.close() }
+            }
+        }
+    }
+
+    @Test
+    fun `a wedged read is bounded by socketTimeout`() {
+        Relay(targetPort = 5555).use { relay ->
+            val dadb = Dadb.create("localhost", relay.port, connectTimeout = 5000, socketTimeout = 1000)
+            try {
+                // Real handshake + op, through the relay, against real adbd.
+                assertThat(dadb.shell("echo warmup").allOutput.trim()).isEqualTo("warmup")
+
+                // Wedge: adbd's responses stop reaching dadb, so the next op's read blocks until
+                // SO_TIMEOUT fires (the connection stays open, so this is a timeout, not an EOF).
+                relay.wedgeReads()
+                assertThrows<SocketTimeoutException> {
+                    assertTimeoutPreemptively(Duration.ofSeconds(8)) { dadb.shell("echo hi") }
+                }
+            } finally {
+                runCatching { dadb.close() }
+            }
         }
     }
 }

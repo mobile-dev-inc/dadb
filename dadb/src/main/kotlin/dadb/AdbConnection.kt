@@ -89,10 +89,12 @@ internal class AdbConnection internal constructor(
         // fires when the connection is genuinely wedged. It is a correctness guard, not a tunable.
         internal const val WRITE_TIMEOUT_MILLIS = 10_000L
 
-        fun connect(socket: Socket, keyPair: AdbKeyPair? = null): AdbConnection {
+        // writeTimeoutMillis is internal-only (tests inject a short value); it is NOT exposed on the
+        // public Dadb.create API, which always uses WRITE_TIMEOUT_MILLIS.
+        fun connect(socket: Socket, keyPair: AdbKeyPair? = null, writeTimeoutMillis: Long = WRITE_TIMEOUT_MILLIS): AdbConnection {
             val source = socket.source()
             val sink = socket.sink()
-            sink.timeout().timeout(WRITE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+            sink.timeout().timeout(writeTimeoutMillis, TimeUnit.MILLISECONDS)
             return connect(source, sink, keyPair, socket)
         }
 
