@@ -33,6 +33,14 @@ internal class DadbResultTest {
     }
 
     @Test
+    fun syncRecvUnexpectedPacketThrowsProtocolException() {
+        // adbd sends a packet id that is neither DATA, DONE, nor FAIL — a protocol desync.
+        val bogus = Buffer().also { it.writeUtf8("OKAY"); it.writeIntLe(0) }
+        val sync = AdbSyncStream(FakeAdbStream(bogus))
+        assertFailsWith<AdbProtocolException> { sync.recv(Buffer(), "/somewhere") }
+    }
+
+    @Test
     fun pullMissingFileReturnsSyncFailure() {
         val dadb = FakeDadb { FakeAdbStream(syncFailBuffer("No such file or directory")) }
         val result = dadb.pull(Buffer(), "/missing")
