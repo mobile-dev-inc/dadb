@@ -25,19 +25,19 @@ import okio.*
 
 interface Dadb : AutoCloseable {
 
-    @Throws(IOException::class)
+    @Throws(AdbException::class)
     fun open(destination: String): AdbStream
 
     fun supportsFeature(feature: String): Boolean
 
-    @Throws(IOException::class)
+    @Throws(AdbException::class)
     fun shell(command: String): AdbShellResponse {
         openShell(command).use { stream ->
             return stream.readAll()
         }
     }
 
-    @Throws(IOException::class)
+    @Throws(AdbException::class)
     fun openShell(command: String = ""): AdbShellStream {
         val stream = open("shell,v2,raw:$command")
         return AdbShellStream(stream)
@@ -200,36 +200,31 @@ interface Dadb : AutoCloseable {
         }
     }
 
-    @Throws(IOException::class)
+    @Throws(AdbException::class)
     fun execCmd(vararg command: String): AdbStream {
         if (!supportsFeature("cmd")) throw UnsupportedOperationException("cmd is not supported on this version of Android")
         val destination = (listOf("exec:cmd") + command).joinToString(" ")
         return open(destination)
     }
 
-    @Throws(IOException::class)
+    @Throws(AdbException::class)
     fun abbExec(vararg command: String): AdbStream {
         if (!supportsFeature("abb_exec")) throw UnsupportedOperationException("abb_exec is not supported on this version of Android")
         val destination = "abb_exec:${command.joinToString("\u0000")}"
         return open(destination)
     }
 
-    @Throws(IOException::class)
-    fun root() {
-        val response = restartAdb(this, "root:")
-        if (!response.startsWith("restarting") && !response.contains("already")) {
-            throw IOException("Failed to restart adb as root: $response")
-        }
-        waitRootOrClose(this, root = true)
-    }
+    @Throws(AdbException::class)
+    fun root(): RootResult = restartAdbd("root:", root = true) { it.startsWith("restarting") || it.contains("already") }
 
-    @Throws(IOException::class)
-    fun unroot() {
-        val response = restartAdb(this, "unroot:")
-        if (!response.startsWith("restarting") && !response.contains("not running as root")) {
-            throw IOException("Failed to restart adb as root: $response")
-        }
-        waitRootOrClose(this, root = false)
+    @Throws(AdbException::class)
+    fun unroot(): RootResult = restartAdbd("unroot:", root = false) { it.startsWith("restarting") || it.contains("not running as root") }
+
+    private fun restartAdbd(service: String, root: Boolean, isSuccess: (String) -> Boolean): RootResult {
+        val response = restartAdb(this, service)
+        if (!isSuccess(response)) return RootResult.Failure(response)
+        waitRootOrClose(this, root)
+        return RootResult.Success
     }
 
     @Throws(InterruptedException::class)

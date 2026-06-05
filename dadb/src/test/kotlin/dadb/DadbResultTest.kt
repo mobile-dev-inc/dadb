@@ -83,4 +83,14 @@ internal class DadbResultTest {
         val result = dadb.install(Buffer().also { it.writeUtf8("apk") }, 3L)
         assertThat(result).isInstanceOf(InstallResult.Success::class.java)
     }
+
+    @Test
+    fun rootFailureReturnsRootFailure() {
+        val dadb = FakeDadb {
+            FakeAdbStream(Buffer().also { it.writeUtf8("adbd cannot run as root in production builds\n") })
+        }
+        val result = dadb.root()
+        assertThat(result).isInstanceOf(RootResult.Failure::class.java)
+        assertThat((result as RootResult.Failure).reason).contains("production builds")
+    }
 }
