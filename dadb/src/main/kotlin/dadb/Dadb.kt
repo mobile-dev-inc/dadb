@@ -120,26 +120,24 @@ interface Dadb : AutoCloseable {
         return if (response.allOutput.startsWith("Success")) InstallResult.Success else InstallResult.Failure(response.allOutput)
     }
 
-    @Throws(IOException::class)
-    fun installMultiple(apks: List<File>, vararg options: String) {
+    @Throws(AdbException::class)
+    fun installMultiple(apks: List<File>, vararg options: String): InstallResult {
         // http://aospxref.com/android-12.0.0_r3/xref/packages/modules/adb/client/adb_install.cpp#538
         if (supportsFeature("cmd")) {
-            val totalLength = apks.map { it.length() }.reduce { acc, l ->  acc + l }
+            val totalLength = apks.map { it.length() }.reduce { acc, l -> acc + l }
             execCmd("package", "install-create", "-S", totalLength.toString(), *options).use { createStream ->
                 val response = createStream.source.readString(Charsets.UTF_8)
-                if (!response.startsWith("Success")) {
-                    throw IOException("connect error for create: $response")
-                }
+                if (!response.startsWith("Success")) return InstallResult.Failure("create session failed: $response")
+
                 val pattern = """\[(\w+)]""".toRegex()
-                val sessionId = pattern.find(response)?.groups?.get(1)?.value ?: throw IOException("failed to create session")
+                val sessionId = pattern.find(response)?.groups?.get(1)?.value
+                    ?: return InstallResult.Failure("failed to parse session id: $response")
 
                 var error: String? = null
-                apks.forEach { apk->
-                    // install write every apk file to stream
-                    execCmd("package", "install-write", "-S", apk.length().toString(), sessionId, apk.name, "-", *options).use { writeStream->
+                apks.forEach { apk ->
+                    execCmd("package", "install-write", "-S", apk.length().toString(), sessionId, apk.name, "-", *options).use { writeStream ->
                         writeStream.sink.writeAll(apk.source())
                         writeStream.sink.flush()
-
                         val writeResponse = writeStream.source.readString(Charsets.UTF_8)
                         if (!writeResponse.startsWith("Success")) {
                             error = writeResponse
@@ -148,48 +146,36 @@ interface Dadb : AutoCloseable {
                     }
                 }
 
-                // commit the session
                 val finalCommand = if (error == null) "install-commit" else "install-abandon"
-                execCmd("package", finalCommand, sessionId, *options).use { commitStream->
+                execCmd("package", finalCommand, sessionId, *options).use { commitStream ->
                     val finalResponse = commitStream.source.readString(Charsets.UTF_8)
-                    if (!finalResponse.startsWith("Success")) {
-                        throw IOException("failed to finalize session: $commitStream")
-                    }
+                    if (!finalResponse.startsWith("Success")) return InstallResult.Failure("failed to finalize session: $finalResponse")
                 }
 
-                if (error != null) {
-                    throw IOException("Install failed: $error")
-                }
+                return if (error == null) InstallResult.Success else InstallResult.Failure(error!!)
             }
         } else {
-            val totalLength = apks.map { it.length() }.reduce { acc, l ->  acc + l }
-            // step1: create session
+            val totalLength = apks.map { it.length() }.reduce { acc, l -> acc + l }
             val response = shell("pm install-create -S $totalLength ${options.joinToString(" ")}")
-            if (!response.allOutput.startsWith("Success")) {
-                throw IOException("pm create session failed: $response")
-            }
+            if (!response.allOutput.startsWith("Success")) return InstallResult.Failure("pm create session failed: ${response.allOutput}")
 
             val pattern = """\[(\w+)]""".toRegex()
-            val sessionId = pattern.find(response.allOutput)?.groups?.get(1)?.value ?: throw IOException("failed to create session")
+            val sessionId = pattern.find(response.allOutput)?.groups?.get(1)?.value
+                ?: return InstallResult.Failure("failed to parse session id: ${response.allOutput}")
             var error: String? = null
 
             val fileNames = apks.map { it.name }
             val remotePaths = fileNames.map { "/data/local/tmp/$it" }
 
-            // step2: write apk to the session
             apks.zip(remotePaths).forEachIndexed { index, pair ->
                 val apk = pair.first
                 val remotePath = pair.second
 
-                try {
-                    // we should push the apk files to device, when push failed, it would stop the installation
-                    push(apk, remotePath)
-                } catch (t: IOException) {
-                    error = t.message
-                    return@forEachIndexed
+                when (val pushResult = push(apk, remotePath)) {
+                    is SyncResult.Failure -> { error = "push failed: ${pushResult.reason}"; return@forEachIndexed }
+                    SyncResult.Success -> Unit
                 }
 
-                // pm install-write -S APK_SIZE SESSION_ID INDEX PATH
                 val writeResponse = shell("pm install-write -S ${apk.length()} $sessionId $index $remotePath")
                 if (!writeResponse.allOutput.startsWith("Success")) {
                     error = writeResponse.allOutput
@@ -197,15 +183,10 @@ interface Dadb : AutoCloseable {
                 }
             }
 
-            // step3: commit or abandon the session
             val finalCommand = if (error == null) "pm install-commit $sessionId" else "pm install-abandon $sessionId"
             val finalResponse = shell(finalCommand)
-            if (!finalResponse.allOutput.startsWith("Success")) {
-                throw IOException("failed to finalize session: $finalResponse")
-            }
-            if (error != null) {
-                throw IOException("Install failed: $error");
-            }
+            if (!finalResponse.allOutput.startsWith("Success")) return InstallResult.Failure("failed to finalize session: ${finalResponse.allOutput}")
+            return if (error == null) InstallResult.Success else InstallResult.Failure(error!!)
         }
     }
 
