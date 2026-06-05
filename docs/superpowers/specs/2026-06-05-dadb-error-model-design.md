@@ -46,14 +46,17 @@ This mirrors what the most active implementations do: Google's `adblib` (distinc
 
 ## 4. Exception hierarchy
 
-All types extend a sealed `AdbException`, which extends `IOException` so **every existing `catch (IOException)` keeps catching them** and existing `@Throws(IOException::class)` clauses remain valid.
+All types extend a sealed `AdbException`, which extends `IOException`. This is a merit choice, not a compatibility one: these failures genuinely *are* socket/transport I/O faults and they are recoverable (reconnect) — the textbook case for a checked `IOException` (Effective Java item 70), mirroring `java.net`'s `SocketException : IOException`. It is also consistent with our own surface: `AdbStream` exposes okio `Source`/`Sink`, whose reads/writes already throw `IOException`, so a consumer streaming from adbd is already handling `IOException`.
+
+**Contract guarantee:** no bare `IOException` ever leaks from a public method — every transport fault is wrapped as one of the subtypes below. Public methods that can fail at the transport are therefore annotated `@Throws(AdbException::class)` (a strictly more precise Java signal than the current `@Throws(IOException::class)`).
 
 ```kotlin
 package dadb
 
 import java.io.IOException
 
-/** Root of all dadb transport/connection failures. Extends IOException for backward-compat. */
+/** Root of all dadb transport/connection failures. Extends IOException because these are
+ *  genuine, recoverable socket I/O faults, consistent with the okio stream surface. */
 sealed class AdbException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
 /** Could not establish the connection: TCP connect/timeout, or the A_CNXN handshake failed.
@@ -108,9 +111,13 @@ sealed interface SyncResult {           // push() and pull()
 
 sealed interface CommandResult {        // uninstall(), root(), unroot()
     object Success : CommandResult
-    data class Failure(val reason: String) : CommandResult
+    /** `exitCode` is populated for shell-backed ops (uninstall); null for daemon ops (root/unroot)
+     *  that have no exit code. Carrying it avoids the current `Dadb.kt:205` sin of discarding it. */
+    data class Failure(val reason: String, val exitCode: Int? = null) : CommandResult
 }
 ```
+
+Failure payloads carry the richest honest detail the operation produced rather than a flattened string. (If, in review, `uninstall` warrants exposing full stdout/stderr, it can return `AdbShellResponse` directly instead — see Open Questions.)
 
 `shell()`/`openShell()` are unchanged — `AdbShellResponse(output, errorOutput, exitCode)` already carries the exit code as a value and never throws on non-zero. It is the template the rest of the API now follows.
 
@@ -142,13 +149,13 @@ private fun nextMessage(command: Int): AdbMessage? {
 }
 ```
 
-A peer `A_CLSE` remains a legitimate EOF (it is how adbd signals a service's output is done); only a genuine socket fault now surfaces as `AdbConnectionClosedException`. This is the one behavioral break in the spec.
+A peer `A_CLSE` remains a legitimate EOF (it is how adbd signals a service's output is done); only a genuine socket fault now surfaces as `AdbConnectionClosedException`. The previous blanket swallow was a latent bug — silently presenting a dropped connection as a clean end-of-stream — so this is simply the correct behavior, not a reluctant break.
 
 ## 7. Per-operation migration table
 
 | Operation | Today | After |
 |---|---|---|
-| `open(dest): AdbStream` | throws `IOException` (incl. internal `AdbStreamClosed`) | throws `AdbStreamOpenException` / `AdbConnectException` / `AdbConnectionClosedException` / `AdbAuthException` (all `: IOException`) |
+| `open(dest): AdbStream` | throws `IOException` (incl. internal `AdbStreamClosed`) | throws `AdbStreamOpenException` / `AdbConnectException` / `AdbConnectionClosedException` / `AdbAuthException` (all `AdbException`) |
 | `shell(cmd): AdbShellResponse` | exit code in result; transport → `IOException` | unchanged; transport → typed `AdbException` |
 | `install(...)`: `Unit` | throws `IOException` on rejection | **returns `InstallResult`**; transport → `AdbException` |
 | `installMultiple(...)`: `Unit` | throws `IOException` on rejection | **returns `InstallResult`**; transport → `AdbException` |
@@ -158,15 +165,21 @@ A peer `A_CLSE` remains a legitimate EOF (it is how adbd signals a service's out
 | `root()` / `unroot()`: `Unit` | throws `IOException` if refused | **returns `CommandResult`**; transport → `AdbException` |
 | `AdbSyncStream.send`/`recv` | throws bare `IOException` | throws internal `AdbSyncFailException` (op) / `AdbException` (transport) |
 
-`AdbStreamClosed` becomes a non-public translation detail. No public method loses its `@Throws(IOException::class)` clause (every new exception is an `IOException`).
+`AdbStreamClosed` becomes a non-public translation detail. Public methods that can fail at the transport are annotated `@Throws(AdbException::class)` (precise Java checked signal); methods that return result types only throw `AdbException` when the transport dies before an outcome can be obtained.
 
-## 8. Backward compatibility & migration
+## 8. Migration (major version)
 
-- **Source-compatible for `catch`:** all new exceptions extend `IOException`; existing `catch (IOException)` blocks keep working and now receive more specific subtypes.
-- **Breaking — return types:** `install`, `installMultiple`, `uninstall`, `push`, `pull`, `root`, `unroot` change from `Unit` to result types. Every caller (notably Maestro) must update call sites to inspect the result. This is the deliberate "clean break" chosen for this redesign.
-- **Breaking — behavior:** the `nextMessage` fix (§6) means a dropped connection mid-stream now throws instead of looking like clean EOF.
-- **Versioning:** ship as a **major** version bump with release notes enumerating the result-type changes and the EOF-behavior change, plus a short migration guide (`when (result) { … }` snippets).
-- **No change** to the wire-protocol classes' on-the-wire behavior (`AdbReader`/`AdbWriter`/`AdbMessageQueue`/`AdbKeyPair`); only how their failures are typed/surfaced.
+This ships as a **major** version bump. Backward compatibility is *not* a design constraint — the contract above is chosen on its merits, and consumers opt into the upgrade when ready. This section exists only to make that opt-in straightforward, not to soften the contract.
+
+Breaking changes consumers will see:
+
+- **Return types:** `install`, `installMultiple`, `uninstall`, `push`, `pull`, `root`, `unroot` change from `Unit` to result types; call sites must inspect the result (`when (result) { is …Success -> …; is …Failure -> … }`).
+- **Exception types:** transport/auth failures are now `AdbException` subtypes instead of bare `IOException`/`IllegalStateException`. Code that switched on exception *messages* should switch on *types* instead.
+- **Behavior:** a connection dropped mid-stream now throws `AdbConnectionClosedException` instead of presenting as a clean EOF (§6).
+
+Release notes will enumerate these with before/after snippets. (Incidental: because `AdbException : IOException`, a coarse `catch (IOException)` still compiles and catches — but that is a consequence of the correct base type, not a goal, and is not how callers should distinguish failures going forward.)
+
+No on-the-wire behavior of the protocol classes (`AdbReader`/`AdbWriter`/`AdbMessageQueue`/`AdbKeyPair`) changes — only how their failures are typed and surfaced.
 
 ## 9. Testing strategy
 
@@ -179,7 +192,13 @@ A peer `A_CLSE` remains a legitimate EOF (it is how adbd signals a service's out
 - Concern #2: split the direct-adbd module from the adb-server module; make binary-spawning opt-in; give server-backed connections a distinct type. The smart-socket error types (`AdbHostResponseException` carrying `service`/`failMessage`) belong to that effort, not this one.
 - Optional `shellOrThrow`-style convenience wrappers, if callers ask for them after the result migration.
 
-## 11. References
+## 11. Open questions
+
+- **Result granularity:** per-operation sealed types (`InstallResult`/`SyncResult`/`CommandResult`) vs. a single shared generic result. Per-op chosen for readable exhaustive `when`; revisit if the sprawl isn't worth it.
+- **`uninstall` shape:** dedicated `CommandResult` (uniform with `root`/`unroot`) vs. returning `AdbShellResponse` directly (most honest — uninstall *is* a shell command, exposes full stdout/stderr/exitCode). Leaning `CommandResult` for API uniformity; flag for decision.
+- **Structured install reasons:** keep `Failure(reason: String)` (the raw pm response) vs. additionally parsing `INSTALL_FAILED_*` codes into an enum. Leaning raw string — parsing is fragile and version-sensitive.
+
+## 12. References
 
 - AOSP `packages/modules/adb`: `protocol.txt` (A_CNXN/A_AUTH/A_OPEN/A_OKAY/A_WRTE/A_CLSE), `SERVICES.TXT` (smart-socket — out of scope), `SYNC.TXT` (sync FAIL), `shell_service.cpp` (`kIdExit`).
 - Google `adblib`: `AdbProtocolErrorException` vs sealed `AdbFailResponseException`; shell-v2 exit code as a flow value.
