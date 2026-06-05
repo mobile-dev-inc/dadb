@@ -22,6 +22,11 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 import kotlin.jvm.Throws
 
+/** Internal signal that an adbd sync operation returned FAIL (e.g. file not found / permission
+ *  denied). Caught by Dadb.push/pull and folded into a [SyncResult.Failure]; never surfaced raw
+ *  from the high-level API. Not an AdbException — the transport is healthy. */
+internal class AdbSyncFailException(val reason: String) : IOException(reason)
+
 internal const val LIST = "LIST"
 internal const val RECV = "RECV"
 internal const val SEND = "SEND"
@@ -67,7 +72,11 @@ class AdbSyncStream(
         stream.sink.flush()
 
         val packet = readPacket()
-        if (packet.id != OKAY) throw IOException("Unexpected sync packet id: ${packet.id}")
+        if (packet.id == FAIL) {
+            val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
+            throw AdbSyncFailException(message)
+        }
+        if (packet.id != OKAY) throw AdbProtocolException("Unexpected sync packet id: ${packet.id}")
     }
 
     @Throws(IOException::class)
@@ -85,9 +94,9 @@ class AdbSyncStream(
             if (packet.id == DONE) break
             if (packet.id == FAIL) {
                 val message = stream.source.readString(packet.arg.toLong(), StandardCharsets.UTF_8)
-                throw IOException("Sync failed: $message")
+                throw AdbSyncFailException(message)
             }
-            if (packet.id != DATA) throw IOException("Unexpected sync packet id: ${packet.id}")
+            if (packet.id != DATA) throw AdbProtocolException("Unexpected sync packet id: ${packet.id}")
             val chunkSize = packet.arg
             stream.source.readFully(buffer, chunkSize.toLong())
             buffer.readAll(sink)
