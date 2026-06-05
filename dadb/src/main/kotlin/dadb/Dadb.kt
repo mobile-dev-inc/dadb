@@ -208,11 +208,13 @@ interface Dadb : AutoCloseable {
         }
     }
 
-    @Throws(IOException::class)
-    fun uninstall(packageName: String) {
+    @Throws(AdbException::class)
+    fun uninstall(packageName: String): UninstallResult {
         val response = shell("cmd package uninstall $packageName")
-        if (response.exitCode != 0) {
-            throw IOException("Uninstall failed: ${response.allOutput}")
+        return if (response.exitCode == 0) {
+            UninstallResult.Success
+        } else {
+            UninstallResult.Failure(reason = response.allOutput, exitCode = response.exitCode)
         }
     }
 

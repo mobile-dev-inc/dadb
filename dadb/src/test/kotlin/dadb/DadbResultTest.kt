@@ -46,4 +46,22 @@ internal class DadbResultTest {
         val result = dadb.push(Buffer().also { it.writeUtf8("hi") }, "/data/local/tmp/hi", 0b110_100_100, 0L)
         assertThat(result).isInstanceOf(SyncResult.Success::class.java)
     }
+
+    @Test
+    fun uninstallNonZeroExitReturnsFailureWithExitCode() {
+        val dadb = FakeDadb {
+            FakeAdbStream(shellV2Buffer(stdout = "Failure [DELETE_FAILED_INTERNAL_ERROR]\n", exitCode = 1))
+        }
+        val result = dadb.uninstall("com.example.absent")
+        assertThat(result).isInstanceOf(UninstallResult.Failure::class.java)
+        result as UninstallResult.Failure
+        assertThat(result.exitCode).isEqualTo(1)
+        assertThat(result.reason).contains("DELETE_FAILED_INTERNAL_ERROR")
+    }
+
+    @Test
+    fun uninstallZeroExitReturnsSuccess() {
+        val dadb = FakeDadb { FakeAdbStream(shellV2Buffer(stdout = "Success\n", exitCode = 0)) }
+        assertThat(dadb.uninstall("com.example")).isInstanceOf(UninstallResult.Success::class.java)
+    }
 }
