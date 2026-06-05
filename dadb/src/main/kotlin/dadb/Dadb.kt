@@ -43,31 +43,41 @@ interface Dadb : AutoCloseable {
         return AdbShellStream(stream)
     }
 
-    @Throws(IOException::class)
-    fun push(src: File, remotePath: String, mode: Int = readMode(src), lastModifiedMs: Long = src.lastModified()) {
-        push(src.source(), remotePath, mode, lastModifiedMs)
+    @Throws(AdbException::class)
+    fun push(src: File, remotePath: String, mode: Int = readMode(src), lastModifiedMs: Long = src.lastModified()): SyncResult {
+        return push(src.source(), remotePath, mode, lastModifiedMs)
     }
 
-    @Throws(IOException::class)
-    fun push(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long) {
+    @Throws(AdbException::class)
+    fun push(source: Source, remotePath: String, mode: Int, lastModifiedMs: Long): SyncResult {
         openSync().use { stream ->
-            stream.send(source, remotePath, mode, lastModifiedMs)
+            return try {
+                stream.send(source, remotePath, mode, lastModifiedMs)
+                SyncResult.Success
+            } catch (e: AdbSyncFailException) {
+                SyncResult.Failure(e.reason)
+            }
         }
     }
 
-    @Throws(IOException::class)
-    fun pull(dst: File, remotePath: String) {
-        pull(dst.sink(append = false), remotePath)
+    @Throws(AdbException::class)
+    fun pull(dst: File, remotePath: String): SyncResult {
+        return pull(dst.sink(append = false), remotePath)
     }
 
-    @Throws(IOException::class)
-    fun pull(sink: Sink, remotePath: String) {
+    @Throws(AdbException::class)
+    fun pull(sink: Sink, remotePath: String): SyncResult {
         openSync().use { stream ->
-            stream.recv(sink, remotePath)
+            return try {
+                stream.recv(sink, remotePath)
+                SyncResult.Success
+            } catch (e: AdbSyncFailException) {
+                SyncResult.Failure(e.reason)
+            }
         }
     }
 
-    @Throws(IOException::class)
+    @Throws(AdbException::class)
     fun openSync(): AdbSyncStream {
         val stream = open("sync:")
         return AdbSyncStream(stream)

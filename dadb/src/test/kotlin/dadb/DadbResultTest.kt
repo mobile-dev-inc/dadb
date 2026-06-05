@@ -31,4 +31,19 @@ internal class DadbResultTest {
         val e = assertFailsWith<AdbSyncFailException> { sync.recv(Buffer(), "/missing") }
         assertThat(e.reason).isEqualTo("No such file or directory")
     }
+
+    @Test
+    fun pullMissingFileReturnsSyncFailure() {
+        val dadb = FakeDadb { FakeAdbStream(syncFailBuffer("No such file or directory")) }
+        val result = dadb.pull(Buffer(), "/missing")
+        assertThat(result).isInstanceOf(SyncResult.Failure::class.java)
+        assertThat((result as SyncResult.Failure).reason).isEqualTo("No such file or directory")
+    }
+
+    @Test
+    fun pushSuccessReturnsSyncSuccess() {
+        val dadb = FakeDadb { FakeAdbStream(syncOkayBuffer()) }
+        val result = dadb.push(Buffer().also { it.writeUtf8("hi") }, "/data/local/tmp/hi", 0b110_100_100, 0L)
+        assertThat(result).isInstanceOf(SyncResult.Success::class.java)
+    }
 }
