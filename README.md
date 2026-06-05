@@ -20,11 +20,25 @@ Connect to `emulator-5554` and install `apkFile`:
 
 ```kotlin
 Dadb.create("localhost", 5555).use { dadb ->
-    dadb.install(apkFile)
+    when (val result = dadb.install(apkFile)) {
+        is InstallResult.Success -> println("installed")
+        is InstallResult.Failure -> println("install failed: ${result.reason}")
+    }
 }
 ```
 
 *Note: Connect to the odd adb daemon port (5555), not the even emulator console port (5554)*
+
+### Error handling
+
+dadb distinguishes *transport* failures from *operation* failures:
+
+- **Transport failures throw** an `AdbException` (an `IOException`): `AdbConnectException`,
+  `AdbAuthException`, `AdbStreamOpenException`, `AdbConnectionClosedException`, `AdbProtocolException`.
+  Catch `AdbException` to decide whether to reconnect.
+- **Operation outcomes are returned**, never thrown: `install`/`installMultiple` → `InstallResult`,
+  `uninstall` → `UninstallResult`, `push`/`pull` → `SyncResult`, `root`/`unroot` → `RootResult`.
+  A non-zero `shell` exit code stays a value on `AdbShellResponse`.
 
 ### Discover a Device
 

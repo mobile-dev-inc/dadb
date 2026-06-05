@@ -1,5 +1,12 @@
 # Changelog
 
+### 2.0.0
+
+* **Breaking:** redesigned error model. Transport failures now throw a typed `AdbException` hierarchy (`AdbConnectException`, `AdbAuthException`, `AdbStreamOpenException`, `AdbConnectionClosedException`, `AdbProtocolException`), all extending `IOException`.
+* **Breaking:** operation outcomes are now returned instead of thrown: `install`/`installMultiple` return `InstallResult`, `uninstall` returns `UninstallResult`, `push`/`pull` return `SyncResult`, `root`/`unroot` return `RootResult`.
+* **Breaking:** a connection dropped mid-stream now throws `AdbConnectionClosedException` instead of presenting as a clean end-of-stream.
+* `pmInstall` (the non-`cmd` install path) now checks the `pm install` result instead of ignoring it.
+
 ### 1.2.10
 
 * Creating configuration for enabling keep alive on dadb socket
