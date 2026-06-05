@@ -64,4 +64,23 @@ internal class DadbResultTest {
         val dadb = FakeDadb { FakeAdbStream(shellV2Buffer(stdout = "Success\n", exitCode = 0)) }
         assertThat(dadb.uninstall("com.example")).isInstanceOf(UninstallResult.Success::class.java)
     }
+
+    @Test
+    fun installCmdPathFailureReturnsInstallFailure() {
+        val dadb = FakeDadb(features = setOf("cmd")) {
+            FakeAdbStream(Buffer().also { it.writeUtf8("Failure [INSTALL_FAILED_INVALID_APK]") })
+        }
+        val result = dadb.install(Buffer().also { it.writeUtf8("apk") }, 3L)
+        assertThat(result).isInstanceOf(InstallResult.Failure::class.java)
+        assertThat((result as InstallResult.Failure).reason).contains("INSTALL_FAILED_INVALID_APK")
+    }
+
+    @Test
+    fun installCmdPathSuccessReturnsSuccess() {
+        val dadb = FakeDadb(features = setOf("cmd")) {
+            FakeAdbStream(Buffer().also { it.writeUtf8("Success\n") })
+        }
+        val result = dadb.install(Buffer().also { it.writeUtf8("apk") }, 3L)
+        assertThat(result).isInstanceOf(InstallResult.Success::class.java)
+    }
 }

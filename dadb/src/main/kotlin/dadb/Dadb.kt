@@ -83,40 +83,41 @@ interface Dadb : AutoCloseable {
         return AdbSyncStream(stream)
     }
 
-    @Throws(IOException::class)
-    fun install(file: File, vararg options: String) {
-        if (supportsFeature("cmd")) {
+    @Throws(AdbException::class)
+    fun install(file: File, vararg options: String): InstallResult {
+        return if (supportsFeature("cmd")) {
             install(file.source(), file.length(), *options)
         } else {
             pmInstall(file, *options)
         }
     }
 
-    @Throws(IOException::class)
-    fun install(source: Source, size: Long, vararg options: String) {
+    @Throws(AdbException::class)
+    fun install(source: Source, size: Long, vararg options: String): InstallResult {
         if (supportsFeature("cmd")) {
             execCmd("package", "install", "-S", size.toString(), *options).use { stream ->
                 stream.sink.writeAll(source)
                 stream.sink.flush()
                 val response = stream.source.readString(Charsets.UTF_8)
-                if (!response.startsWith("Success")) {
-                    throw IOException("Install failed: $response")
-                }
+                return if (response.startsWith("Success")) InstallResult.Success else InstallResult.Failure(response)
             }
         } else {
             val tempFile = kotlin.io.path.createTempFile()
             val fileSink = tempFile.sink().buffer()
             fileSink.writeAll(source)
             fileSink.flush()
-            pmInstall(tempFile.toFile(), *options)
+            return pmInstall(tempFile.toFile(), *options)
         }
     }
 
-    private fun pmInstall(file: File, vararg options: String) {
-        val fileName = file.name
-        val remotePath = "/data/local/tmp/$fileName"
-        push(file, remotePath)
-        shell("pm install ${options.joinToString(" ")} \"$remotePath\"")
+    private fun pmInstall(file: File, vararg options: String): InstallResult {
+        val remotePath = "/data/local/tmp/${file.name}"
+        when (val pushResult = push(file, remotePath)) {
+            is SyncResult.Failure -> return InstallResult.Failure("push failed: ${pushResult.reason}")
+            SyncResult.Success -> Unit
+        }
+        val response = shell("pm install ${options.joinToString(" ")} \"$remotePath\"")
+        return if (response.allOutput.startsWith("Success")) InstallResult.Success else InstallResult.Failure(response.allOutput)
     }
 
     @Throws(IOException::class)
