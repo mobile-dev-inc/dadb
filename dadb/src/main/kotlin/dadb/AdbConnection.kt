@@ -39,7 +39,7 @@ internal class AdbConnection internal constructor(
     private val random = Random()
     private val messageQueue = AdbMessageQueue(adbReader)
 
-    @Throws(IOException::class)
+    @Throws(AdbException::class)
     fun open(destination: String): AdbStream {
         val localId = newId()
         messageQueue.startListening(localId)
@@ -52,6 +52,14 @@ internal class AdbConnection internal constructor(
             // adbd answered A_OPEN with A_CLSE: it refused this service. Connection is still alive.
             messageQueue.stopListening(localId)
             throw AdbStreamOpenException(destination, "adbd refused to open stream: $destination", e)
+        } catch (e: AdbException) {
+            // Already a typed transport fault — don't re-wrap.
+            messageQueue.stopListening(localId)
+            throw e
+        } catch (e: IOException) {
+            // Raw socket fault (EOF/RST) while opening: the connection died mid-handshake.
+            messageQueue.stopListening(localId)
+            throw AdbConnectionClosedException("Connection lost while opening stream: $destination", e)
         } catch (e: Throwable) {
             messageQueue.stopListening(localId)
             throw e
