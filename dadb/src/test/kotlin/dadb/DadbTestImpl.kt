@@ -3,6 +3,7 @@ package dadb
 import org.junit.jupiter.api.Test
 import java.net.Socket
 import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 
 internal class DadbTestImpl : DadbTest() {
@@ -57,6 +58,18 @@ internal class DadbTestImpl : DadbTest() {
     fun invalidSocketTimeoutConstructorValue() {
         assertFails("Invalid socketTimeout value was not validated") {
             Dadb.create("localhost", 5555, connectTimeout = 0, socketTimeout = -1)
+        }
+    }
+
+    // AdbStreamOpenException is a direct-adbd concept; it lives here (direct connection) rather than
+    // in the shared DadbTest, because the adb-server path (AdbServerTest) still surfaces a generic
+    // IOException for a refused service (that path is out of scope for the error-model redesign).
+    @Test
+    fun open_invalidService_throwsStreamOpenException() {
+        localEmulator { dadb ->
+            assertFailsWith<AdbStreamOpenException> {
+                dadb.open("definitely-not-a-real-service:")
+            }
         }
     }
 
