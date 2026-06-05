@@ -96,28 +96,42 @@ class AdbProtocolException(message: String, cause: Throwable? = null) : AdbExcep
 
 Expected, in-band adbd outcomes become return values. Per-operation sealed types keep each call site's `when` exhaustive and readable.
 
+The return type of each operation mirrors **what adbd actually does** for it, so the contract never obfuscates the underlying interaction:
+
+| Operation | adbd interaction | Return type |
+|---|---|---|
+| `install` / `installMultiple` | `exec:cmd` / shell; verdict is a `Success` / `Failure[…]` **string** (the `cmd` path has no exit code) | `InstallResult` |
+| `push` / `pull` | `sync:` sub-protocol; `FAIL` + message | `SyncResult` |
+| `uninstall` | `shell("cmd package uninstall …")` — a **shell command** | `AdbShellResponse` (reused) |
+| `root` / `unroot` | `root:` / `unroot:` adbd service; a **text line, no exit code** | `RootResult` |
+
 ```kotlin
-sealed interface InstallResult {
+sealed interface InstallResult {        // install(), installMultiple()
     object Success : InstallResult
-    /** `reason` is the raw pm/`cmd package` response (e.g. "Failure [INSTALL_FAILED_...]"). */
+    /** Raw pm/`cmd package` verdict, surfaced opaquely — exactly as the canonical adb client does:
+     *  client/adb_install.cpp checks `strncmp("Success", buf, 7)` and prints any other response
+     *  verbatim. The `INSTALL_FAILED_*` codes are a frameworks/base (PackageManager) concept, NOT
+     *  part of the adbd contract, so dadb does not parse them into an enum. */
     data class Failure(val reason: String) : InstallResult
 }
 
-sealed interface SyncResult {           // push() and pull()
+sealed interface SyncResult {           // push(), pull()
     object Success : SyncResult
-    /** `reason` is the adbd sync FAIL message (e.g. "No such file or directory"). */
+    /** The adbd sync FAIL message, e.g. "No such file or directory" (SYNC.TXT). */
     data class Failure(val reason: String) : SyncResult
 }
 
-sealed interface CommandResult {        // uninstall(), root(), unroot()
-    object Success : CommandResult
-    /** `exitCode` is populated for shell-backed ops (uninstall); null for daemon ops (root/unroot)
-     *  that have no exit code. Carrying it avoids the current `Dadb.kt:205` sin of discarding it. */
-    data class Failure(val reason: String, val exitCode: Int? = null) : CommandResult
+sealed interface RootResult {           // root(), unroot()
+    object Success : RootResult
+    /** The adbd root:/unroot: service response line, e.g.
+     *  "adbd cannot run as root in production builds". This service has no exit code. */
+    data class Failure(val reason: String) : RootResult
 }
 ```
 
-Failure payloads carry the richest honest detail the operation produced rather than a flattened string. (If, in review, `uninstall` warrants exposing full stdout/stderr, it can return `AdbShellResponse` directly instead — see Open Questions.)
+**`uninstall` returns `AdbShellResponse` directly** rather than a domain wrapper. It *is* `cmd package uninstall` over the shell service, so the honest contract exposes adbd's actual `output`/`errorOutput`/`exitCode`; the caller checks `exitCode == 0`. A `CommandResult.Failure(reason)` wrapper would obfuscate that — discarding stderr and the real process exit code (repeating the `Dadb.kt:205` sin). The one accepted tradeoff: the public type acknowledges uninstall is implemented as a shell command, which is exactly what adbd does.
+
+**Granularity:** seven result-returning methods collapse to three sealed types (`InstallResult`, `SyncResult`, `RootResult`) plus the reused `AdbShellResponse`. This is deliberately per-*shape*, not a single generic `Result<T>`: the shapes differ because the adbd interactions differ, and a generic wrapper would erase exactly those distinctions.
 
 `shell()`/`openShell()` are unchanged — `AdbShellResponse(output, errorOutput, exitCode)` already carries the exit code as a value and never throws on non-zero. It is the template the rest of the API now follows.
 
@@ -125,7 +139,8 @@ Failure payloads carry the richest honest detail the operation produced rather t
 
 - `AdbSyncStream.send`/`recv` (`AdbSync.kt`) throw a new internal `AdbSyncFailException(message)` for a sync `FAIL`/unexpected-id (replacing the bare `IOException` at `:70`, `:88`, `:90`). `Dadb.push`/`pull` catch it → `SyncResult.Failure(message)`; any `AdbConnectionClosedException`/`AdbProtocolException` propagates untouched.
 - `Dadb.install`/`installMultiple` return `InstallResult` by inspecting the `cmd`/`pm` response instead of `throw IOException("Install failed: …")`.
-- `Dadb.uninstall`/`root`/`unroot` return `CommandResult` by inspecting the exit code / restart response instead of throwing.
+- `Dadb.uninstall` returns the shell command's `AdbShellResponse` unchanged (no throw on non-zero exit).
+- `Dadb.root`/`unroot` return `RootResult` by classifying the adbd service's response line instead of throwing.
 
 So every high-level op may still **throw** an `AdbException` (transport/auth died → no outcome), and otherwise **returns** a result (an outcome was obtained, success or failure).
 
@@ -159,10 +174,10 @@ A peer `A_CLSE` remains a legitimate EOF (it is how adbd signals a service's out
 | `shell(cmd): AdbShellResponse` | exit code in result; transport → `IOException` | unchanged; transport → typed `AdbException` |
 | `install(...)`: `Unit` | throws `IOException` on rejection | **returns `InstallResult`**; transport → `AdbException` |
 | `installMultiple(...)`: `Unit` | throws `IOException` on rejection | **returns `InstallResult`**; transport → `AdbException` |
-| `uninstall(pkg)`: `Unit` | throws `IOException` if exit≠0 | **returns `CommandResult`**; transport → `AdbException` |
+| `uninstall(pkg)`: `Unit` | throws `IOException` if exit≠0 | **returns `AdbShellResponse`** (exit code in the value); transport → `AdbException` |
 | `push(...)`: `Unit` | throws `IOException` on sync FAIL | **returns `SyncResult`**; transport → `AdbException` |
 | `pull(...)`: `Unit` | throws `IOException` on sync FAIL/missing file | **returns `SyncResult`**; transport → `AdbException` |
-| `root()` / `unroot()`: `Unit` | throws `IOException` if refused | **returns `CommandResult`**; transport → `AdbException` |
+| `root()` / `unroot()`: `Unit` | throws `IOException` if refused | **returns `RootResult`**; transport → `AdbException` |
 | `AdbSyncStream.send`/`recv` | throws bare `IOException` | throws internal `AdbSyncFailException` (op) / `AdbException` (transport) |
 
 `AdbStreamClosed` becomes a non-public translation detail. Public methods that can fail at the transport are annotated `@Throws(AdbException::class)` (precise Java checked signal); methods that return result types only throw `AdbException` when the transport dies before an outcome can be obtained.
@@ -185,22 +200,17 @@ No on-the-wire behavior of the protocol classes (`AdbReader`/`AdbWriter`/`AdbMes
 
 - **Unit (no emulator):** drive `AdbConnection.connect` and `open` against in-memory okio `Buffer`s (as `AdbStreamTest` already does) to assert each apacket failure maps to the right type — `A_CNXN` failure → `AdbConnectException`, `A_AUTH` rejection → `AdbAuthException`, `A_OPEN`→`A_CLSE` → `AdbStreamOpenException`, mid-stream socket fault → `AdbConnectionClosedException`, malformed apacket → `AdbProtocolException`. Cover the `nextMessage` split: peer `A_CLSE` → EOF (`read() == -1`), socket fault → throw.
 - **Sync codec:** feed a `FAIL`+message packet → assert `AdbSyncStream.recv` throws `AdbSyncFailException` and `Dadb.pull` returns `SyncResult.Failure(message)`.
-- **Emulator (existing `DadbTest` style):** install a bad/duplicate apk → `InstallResult.Failure`; uninstall an absent package → `CommandResult.Failure`; pull a missing path → `SyncResult.Failure`; happy paths → `Success`.
+- **Emulator (existing `DadbTest` style):** install a bad/duplicate apk → `InstallResult.Failure`; uninstall an absent package → `AdbShellResponse` with non-zero `exitCode`; pull a missing path → `SyncResult.Failure`; `unroot` on a production-style build → `RootResult.Failure`; happy paths → `Success`.
 
 ## 10. Future / not now
 
 - Concern #2: split the direct-adbd module from the adb-server module; make binary-spawning opt-in; give server-backed connections a distinct type. The smart-socket error types (`AdbHostResponseException` carrying `service`/`failMessage`) belong to that effort, not this one.
 - Optional `shellOrThrow`-style convenience wrappers, if callers ask for them after the result migration.
 
-## 11. Open questions
+## 11. References
 
-- **Result granularity:** per-operation sealed types (`InstallResult`/`SyncResult`/`CommandResult`) vs. a single shared generic result. Per-op chosen for readable exhaustive `when`; revisit if the sprawl isn't worth it.
-- **`uninstall` shape:** dedicated `CommandResult` (uniform with `root`/`unroot`) vs. returning `AdbShellResponse` directly (most honest — uninstall *is* a shell command, exposes full stdout/stderr/exitCode). Leaning `CommandResult` for API uniformity; flag for decision.
-- **Structured install reasons:** keep `Failure(reason: String)` (the raw pm response) vs. additionally parsing `INSTALL_FAILED_*` codes into an enum. Leaning raw string — parsing is fragile and version-sensitive.
-
-## 12. References
-
-- AOSP `packages/modules/adb`: `protocol.txt` (A_CNXN/A_AUTH/A_OPEN/A_OKAY/A_WRTE/A_CLSE), `SERVICES.TXT` (smart-socket — out of scope), `SYNC.TXT` (sync FAIL), `shell_service.cpp` (`kIdExit`).
+- AOSP `packages/modules/adb`: `protocol.txt` (A_CNXN/A_AUTH/A_OPEN/A_OKAY/A_WRTE/A_CLSE), `SERVICES.TXT` (smart-socket — out of scope), `SYNC.TXT` (sync FAIL), `shell_service.cpp` (`kIdExit`), `client/adb_install.cpp` (`strncmp("Success", buf, 7)` — failure text is opaque, not structured).
+- `frameworks/base` `core/java/android/content/pm/PackageManager.java` — the `INSTALL_FAILED_*` constants. Noted only to document that they live in the framework, *not* the adb/adbd contract, which is why dadb does not parse them.
 - Google `adblib`: `AdbProtocolErrorException` vs sealed `AdbFailResponseException`; shell-v2 exit code as a flow value.
 - `adam` (Malinskiy): `ShellCommandResult.exitCode`; the cautionary conflation of transport-dead and FAIL into one `RequestRejectedException`.
 - Rust `adb_client`: `RustADBError` — non-zero exit is `Ok`, FAIL string carried in `ADBRequestFailed`.
