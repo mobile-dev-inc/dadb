@@ -48,6 +48,10 @@ internal class AdbConnection internal constructor(
             val message = messageQueue.take(localId, Constants.CMD_OKAY)
             val remoteId = message.arg0
             return AdbStreamImpl(messageQueue, adbWriter, maxPayloadSize, localId, remoteId)
+        } catch (e: AdbStreamClosed) {
+            // adbd answered A_OPEN with A_CLSE: it refused this service. Connection is still alive.
+            messageQueue.stopListening(localId)
+            throw AdbStreamOpenException(destination, "adbd refused to open stream: $destination", e)
         } catch (e: Throwable) {
             messageQueue.stopListening(localId)
             throw e

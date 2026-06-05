@@ -36,6 +36,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Ignore
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 
 internal abstract class DadbTest : BaseConcurrencyTest() {
 
@@ -315,6 +316,15 @@ internal abstract class DadbTest : BaseConcurrencyTest() {
             dadb.openShell("echo bénéficiaire").use { shellStream ->
                 val shellResponse = shellStream.readAll()
                 assertShellResponse(shellResponse, 0, "bénéficiaire\n")
+            }
+        }
+    }
+
+    @Test
+    fun open_invalidService_throwsStreamOpenException() {
+        localEmulator { dadb ->
+            assertFailsWith<AdbStreamOpenException> {
+                dadb.open("definitely-not-a-real-service:")
             }
         }
     }
