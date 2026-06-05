@@ -23,3 +23,21 @@ sealed interface UninstallResult {
     object Success : UninstallResult
     data class Failure(val reason: String, val exitCode: Int) : UninstallResult
 }
+
+/** Run [block] if this is a [UninstallResult.Success]; returns the receiver for chaining. */
+inline fun UninstallResult.onSuccess(block: () -> Unit): UninstallResult {
+    if (this is UninstallResult.Success) block()
+    return this
+}
+
+/** Run [block] if this is a [UninstallResult.Failure]; returns the receiver for chaining. */
+inline fun UninstallResult.onFailure(block: (UninstallResult.Failure) -> Unit): UninstallResult {
+    if (this is UninstallResult.Failure) block(this)
+    return this
+}
+
+/** Fail-fast: throw [AdbOperationFailedException] (carrying the process [exitCode]) if this is a
+ *  [UninstallResult.Failure]. */
+fun UninstallResult.orThrow() {
+    if (this is UninstallResult.Failure) throw AdbOperationFailedException(reason, exitCode)
+}

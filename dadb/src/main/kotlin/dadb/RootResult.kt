@@ -22,3 +22,20 @@ sealed interface RootResult {
     object Success : RootResult
     data class Failure(val reason: String) : RootResult
 }
+
+/** Run [block] if this is a [RootResult.Success]; returns the receiver for chaining. */
+inline fun RootResult.onSuccess(block: () -> Unit): RootResult {
+    if (this is RootResult.Success) block()
+    return this
+}
+
+/** Run [block] if this is a [RootResult.Failure]; returns the receiver for chaining. */
+inline fun RootResult.onFailure(block: (RootResult.Failure) -> Unit): RootResult {
+    if (this is RootResult.Failure) block(this)
+    return this
+}
+
+/** Fail-fast: throw [AdbOperationFailedException] if this is a [RootResult.Failure]. */
+fun RootResult.orThrow() {
+    if (this is RootResult.Failure) throw AdbOperationFailedException(reason)
+}

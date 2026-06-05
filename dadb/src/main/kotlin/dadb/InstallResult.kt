@@ -26,3 +26,20 @@ sealed interface InstallResult {
      *  not parsed into an enum. */
     data class Failure(val reason: String) : InstallResult
 }
+
+/** Run [block] if this is a [InstallResult.Success]; returns the receiver for chaining. */
+inline fun InstallResult.onSuccess(block: () -> Unit): InstallResult {
+    if (this is InstallResult.Success) block()
+    return this
+}
+
+/** Run [block] if this is a [InstallResult.Failure]; returns the receiver for chaining. */
+inline fun InstallResult.onFailure(block: (InstallResult.Failure) -> Unit): InstallResult {
+    if (this is InstallResult.Failure) block(this)
+    return this
+}
+
+/** Fail-fast: throw [AdbOperationFailedException] if this is a [InstallResult.Failure]. */
+fun InstallResult.orThrow() {
+    if (this is InstallResult.Failure) throw AdbOperationFailedException(reason)
+}

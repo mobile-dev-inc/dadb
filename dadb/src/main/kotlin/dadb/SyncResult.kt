@@ -22,3 +22,20 @@ sealed interface SyncResult {
     object Success : SyncResult
     data class Failure(val reason: String) : SyncResult
 }
+
+/** Run [block] if this is a [SyncResult.Success]; returns the receiver for chaining. */
+inline fun SyncResult.onSuccess(block: () -> Unit): SyncResult {
+    if (this is SyncResult.Success) block()
+    return this
+}
+
+/** Run [block] if this is a [SyncResult.Failure]; returns the receiver for chaining. */
+inline fun SyncResult.onFailure(block: (SyncResult.Failure) -> Unit): SyncResult {
+    if (this is SyncResult.Failure) block(this)
+    return this
+}
+
+/** Fail-fast: throw [AdbOperationFailedException] if this is a [SyncResult.Failure]. */
+fun SyncResult.orThrow() {
+    if (this is SyncResult.Failure) throw AdbOperationFailedException(reason)
+}
