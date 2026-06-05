@@ -20,6 +20,7 @@ package dadb
 import com.google.common.truth.Truth
 import okio.Buffer
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 
 internal class AdbStreamTest {
 
@@ -33,9 +34,35 @@ internal class AdbStreamTest {
         Truth.assertThat(stream.source.readByteArray()).isEqualTo(payload)
     }
 
+    @Test
+    fun peerCloseIsCleanEof() {
+        // Reader yields a CLSE for localId=1 and nothing else.
+        val buffer = Buffer()
+        AdbWriter(buffer).write(Constants.CMD_CLSE, 2, 1, null, 0, 0)
+        val messageQueue = AdbMessageQueue(AdbReader(buffer))
+        messageQueue.startListening(1)
+        val stream = AdbStreamImpl(messageQueue, AdbWriter(Buffer()), 1024, 1, 2)
+
+        // A clean peer close reads as EOF (empty), NOT an exception.
+        Truth.assertThat(stream.source.readByteArray()).isEqualTo(ByteArray(0))
+    }
+
+    @Test
+    fun socketFaultThrowsConnectionClosed() {
+        // Empty reader: the next read hits EOF on the socket itself (not a protocol CLSE).
+        val messageQueue = AdbMessageQueue(AdbReader(Buffer()))
+        messageQueue.startListening(1)
+        val stream = AdbStreamImpl(messageQueue, AdbWriter(Buffer()), 1024, 1, 2)
+
+        assertFailsWith<AdbConnectionClosedException> { stream.source.readByteArray() }
+    }
+
     private fun createAdbReader(localId: Int, remoteId: Int, writePayload: ByteArray): AdbReader {
         val source = Buffer()
-        AdbWriter(source).write(Constants.CMD_WRTE, remoteId, localId, writePayload, 0, writePayload.size)
+        val writer = AdbWriter(source)
+        writer.write(Constants.CMD_WRTE, remoteId, localId, writePayload, 0, writePayload.size)
+        // Append a proper A_CLSE so the stream ends cleanly, matching real device behaviour.
+        writer.write(Constants.CMD_CLSE, remoteId, localId, null, 0, 0)
         return AdbReader(source)
     }
 }

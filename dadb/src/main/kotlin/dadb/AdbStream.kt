@@ -117,9 +117,14 @@ internal class AdbStreamImpl internal constructor(
     private fun nextMessage(command: Int): AdbMessage? {
         return try {
             messageQueue.take(localId, command)
-        } catch (e: IOException) {
+        } catch (e: AdbStreamClosed) {
+            // Peer sent A_CLSE: normal end-of-stream (e.g. shell/exec output finished). EOF is correct.
             close()
-            return null
+            null
+        } catch (e: IOException) {
+            // Real socket fault (EOF/RST) mid-stream: the transport died, not a clean close.
+            close()
+            throw AdbConnectionClosedException("Connection lost while reading stream $localId", e)
         }
     }
 
