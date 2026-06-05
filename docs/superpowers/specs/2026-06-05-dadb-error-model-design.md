@@ -94,16 +94,24 @@ class AdbProtocolException(message: String, cause: Throwable? = null) : AdbExcep
 
 ## 5. Result types
 
-Expected, in-band adbd outcomes become return values. Per-operation sealed types keep each call site's `when` exhaustive and readable.
+Expected, in-band adbd outcomes become return values, never exceptions. Each **named high-level operation returns its own domain result type**, so peer operations are peers in the API — `install` and `uninstall` both return an `…Result`, not one a result and the other a raw shell response. Each `Failure` carries the richest honest detail the underlying adbd interaction produced, so the wrapper never *hides* what adbd did even though it presents a uniform surface.
 
-The return type of each operation mirrors **what adbd actually does** for it, so the contract never obfuscates the underlying interaction:
+### Two-axis consistency rule
 
-| Operation | adbd interaction | Return type |
-|---|---|---|
-| `install` / `installMultiple` | `exec:cmd` / shell; verdict is a `Success` / `Failure[…]` **string** (the `cmd` path has no exit code) | `InstallResult` |
-| `push` / `pull` | `sync:` sub-protocol; `FAIL` + message | `SyncResult` |
-| `uninstall` | `shell("cmd package uninstall …")` — a **shell command** | `AdbShellResponse` (reused) |
-| `root` / `unroot` | `root:` / `unroot:` adbd service; a **text line, no exit code** | `RootResult` |
+The `Dadb` methods sit at different distances from adbd — `open()` is 1:1 with an `A_OPEN`; `shell`/`push`/`pull`/`uninstall` are single-service; `install`/`installMultiple`/`root`/`unroot` are composites that orchestrate several adbd ops. Consistency comes from applying one rule across all of them, on two independent axes:
+
+- **Transport/connection failures are universal.** Every operation can throw the single `AdbException` hierarchy (§4), because every operation ultimately goes through `open()` and the stream. These are *never* operation-specific.
+- **Outcome results are operation-specific.** Each named operation gets its own `…Result { Success | Failure(…) }`; peers share one type. A composite folds any constituent failure into *its own* verdict rather than leaking a lower-level result (e.g. an `install` whose `pm`-path push sync-FAILs returns `InstallResult.Failure`, not a `SyncResult`).
+
+This is the deliberate choice of API-surface uniformity ("Philosophy B") over mechanism-mirroring: `uninstall` gets a domain type even though it is one shell command, accepting a small amount of wrapping in exchange for `install`/`uninstall` being true peers. The non-obfuscation constraint is preserved by carrying adbd's real detail in the `Failure` payload.
+
+| Operation(s) | Result type |
+|---|---|
+| `install`, `installMultiple` | `InstallResult` |
+| `uninstall` | `UninstallResult` |
+| `push`, `pull` | `SyncResult` |
+| `root`, `unroot` | `RootResult` |
+| `shell`, `openShell` | `AdbShellResponse` / `AdbShellStream` (generic primitive — see below) |
 
 ```kotlin
 sealed interface InstallResult {        // install(), installMultiple()
@@ -113,6 +121,15 @@ sealed interface InstallResult {        // install(), installMultiple()
      *  verbatim. The `INSTALL_FAILED_*` codes are a frameworks/base (PackageManager) concept, NOT
      *  part of the adbd contract, so dadb does not parse them into an enum. */
     data class Failure(val reason: String) : InstallResult
+}
+
+sealed interface UninstallResult {      // uninstall()
+    object Success : UninstallResult
+    /** `uninstall` is `cmd package uninstall` over the shell service. Failure preserves adbd's
+     *  actual process `exitCode` and combined output (`reason`) so the domain wrapper hides
+     *  nothing — the whole point of choosing a wrapper here is peer-symmetry with install, not
+     *  concealment. */
+    data class Failure(val reason: String, val exitCode: Int) : UninstallResult
 }
 
 sealed interface SyncResult {           // push(), pull()
@@ -129,17 +146,15 @@ sealed interface RootResult {           // root(), unroot()
 }
 ```
 
-**`uninstall` returns `AdbShellResponse` directly** rather than a domain wrapper. It *is* `cmd package uninstall` over the shell service, so the honest contract exposes adbd's actual `output`/`errorOutput`/`exitCode`; the caller checks `exitCode == 0`. A `CommandResult.Failure(reason)` wrapper would obfuscate that — discarding stderr and the real process exit code (repeating the `Dadb.kt:205` sin). The one accepted tradeoff: the public type acknowledges uninstall is implemented as a shell command, which is exactly what adbd does.
+**Granularity:** the named operations collapse to four domain types (`InstallResult`, `UninstallResult`, `SyncResult`, `RootResult`), peers sharing one type. Not a single generic `Result<T>` — the `Failure` payloads genuinely differ (uninstall carries an exit code; the others do not), and a generic wrapper would erase those distinctions.
 
-**Granularity:** seven result-returning methods collapse to three sealed types (`InstallResult`, `SyncResult`, `RootResult`) plus the reused `AdbShellResponse`. This is deliberately per-*shape*, not a single generic `Result<T>`: the shapes differ because the adbd interactions differ, and a generic wrapper would erase exactly those distinctions.
-
-`shell()`/`openShell()` are unchanged — `AdbShellResponse(output, errorOutput, exitCode)` already carries the exit code as a value and never throws on non-zero. It is the template the rest of the API now follows.
+**`shell`/`openShell` stay `AdbShellResponse`/`AdbShellStream`.** These are the *generic shell primitive* callers build their own commands on, not a named package-lifecycle operation, so they expose the shell service's outcome directly (`exitCode` as a value, never thrown). `shell` is the tool; `install`/`uninstall`/etc. are the abstractions built with it.
 
 **Division of labor — results vs throws within an operation.** Low-level stream codecs keep throwing internally; the high-level operation catches the *operation-failure* signal and returns a `Failure`, while letting *transport* exceptions propagate:
 
 - `AdbSyncStream.send`/`recv` (`AdbSync.kt`) throw a new internal `AdbSyncFailException(message)` for a sync `FAIL`/unexpected-id (replacing the bare `IOException` at `:70`, `:88`, `:90`). `Dadb.push`/`pull` catch it → `SyncResult.Failure(message)`; any `AdbConnectionClosedException`/`AdbProtocolException` propagates untouched.
 - `Dadb.install`/`installMultiple` return `InstallResult` by inspecting the `cmd`/`pm` response instead of `throw IOException("Install failed: …")`.
-- `Dadb.uninstall` returns the shell command's `AdbShellResponse` unchanged (no throw on non-zero exit).
+- `Dadb.uninstall` runs the shell command and maps the `AdbShellResponse` into `UninstallResult` — `exitCode == 0` → `Success`, else `Failure(reason = response.allOutput, exitCode = response.exitCode)`.
 - `Dadb.root`/`unroot` return `RootResult` by classifying the adbd service's response line instead of throwing.
 
 So every high-level op may still **throw** an `AdbException` (transport/auth died → no outcome), and otherwise **returns** a result (an outcome was obtained, success or failure).
@@ -174,7 +189,7 @@ A peer `A_CLSE` remains a legitimate EOF (it is how adbd signals a service's out
 | `shell(cmd): AdbShellResponse` | exit code in result; transport → `IOException` | unchanged; transport → typed `AdbException` |
 | `install(...)`: `Unit` | throws `IOException` on rejection | **returns `InstallResult`**; transport → `AdbException` |
 | `installMultiple(...)`: `Unit` | throws `IOException` on rejection | **returns `InstallResult`**; transport → `AdbException` |
-| `uninstall(pkg)`: `Unit` | throws `IOException` if exit≠0 | **returns `AdbShellResponse`** (exit code in the value); transport → `AdbException` |
+| `uninstall(pkg)`: `Unit` | throws `IOException` if exit≠0 | **returns `UninstallResult`** (`Failure` carries `reason` + `exitCode`); transport → `AdbException` |
 | `push(...)`: `Unit` | throws `IOException` on sync FAIL | **returns `SyncResult`**; transport → `AdbException` |
 | `pull(...)`: `Unit` | throws `IOException` on sync FAIL/missing file | **returns `SyncResult`**; transport → `AdbException` |
 | `root()` / `unroot()`: `Unit` | throws `IOException` if refused | **returns `RootResult`**; transport → `AdbException` |
@@ -200,7 +215,7 @@ No on-the-wire behavior of the protocol classes (`AdbReader`/`AdbWriter`/`AdbMes
 
 - **Unit (no emulator):** drive `AdbConnection.connect` and `open` against in-memory okio `Buffer`s (as `AdbStreamTest` already does) to assert each apacket failure maps to the right type — `A_CNXN` failure → `AdbConnectException`, `A_AUTH` rejection → `AdbAuthException`, `A_OPEN`→`A_CLSE` → `AdbStreamOpenException`, mid-stream socket fault → `AdbConnectionClosedException`, malformed apacket → `AdbProtocolException`. Cover the `nextMessage` split: peer `A_CLSE` → EOF (`read() == -1`), socket fault → throw.
 - **Sync codec:** feed a `FAIL`+message packet → assert `AdbSyncStream.recv` throws `AdbSyncFailException` and `Dadb.pull` returns `SyncResult.Failure(message)`.
-- **Emulator (existing `DadbTest` style):** install a bad/duplicate apk → `InstallResult.Failure`; uninstall an absent package → `AdbShellResponse` with non-zero `exitCode`; pull a missing path → `SyncResult.Failure`; `unroot` on a production-style build → `RootResult.Failure`; happy paths → `Success`.
+- **Emulator (existing `DadbTest` style):** install a bad/duplicate apk → `InstallResult.Failure`; uninstall an absent package → `UninstallResult.Failure` (non-zero `exitCode` preserved); pull a missing path → `SyncResult.Failure`; `unroot` on a production-style build → `RootResult.Failure`; happy paths → `Success`.
 
 ## 10. Future / not now
 
