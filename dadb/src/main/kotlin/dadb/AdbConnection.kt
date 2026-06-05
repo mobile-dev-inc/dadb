@@ -83,12 +83,20 @@ internal class AdbConnection internal constructor(
             return connect(source, sink, keyPair, socket)
         }
 
-        private fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null, closeable: Closeable? = null): AdbConnection {
+        internal fun connect(source: Source, sink: Sink, keyPair: AdbKeyPair? = null, closeable: Closeable? = null): AdbConnection {
             val adbReader = AdbReader(source)
             val adbWriter = AdbWriter(sink)
 
             try {
                 return connect(adbReader, adbWriter, keyPair, closeable)
+            } catch (e: AdbException) {
+                adbReader.close()
+                adbWriter.close()
+                throw e
+            } catch (e: IOException) {
+                adbReader.close()
+                adbWriter.close()
+                throw AdbConnectException("Connection handshake failed", e)
             } catch (t: Throwable) {
                 adbReader.close()
                 adbWriter.close()
@@ -102,8 +110,8 @@ internal class AdbConnection internal constructor(
             var message = adbReader.readMessage()
 
             if (message.command == Constants.CMD_AUTH) {
-                checkNotNull(keyPair) { "Authentication required but no KeyPair provided" }
-                check(message.arg0 == Constants.AUTH_TYPE_TOKEN) { "Unsupported auth type: $message" }
+                if (keyPair == null) throw AdbAuthException("Authentication required but no key pair was provided")
+                if (message.arg0 != Constants.AUTH_TYPE_TOKEN) throw AdbProtocolException("Unsupported auth type: $message")
 
                 val signature = keyPair.signPayload(message)
                 adbWriter.writeAuth(Constants.AUTH_TYPE_SIGNATURE, signature)
@@ -115,7 +123,11 @@ internal class AdbConnection internal constructor(
                 }
             }
 
-            if (message.command != Constants.CMD_CNXN) throw IOException("Connection failed: $message")
+            if (message.command != Constants.CMD_CNXN) {
+                // A trailing AUTH means the device rejected our key / stayed unauthorized.
+                if (message.command == Constants.CMD_AUTH) throw AdbAuthException("Device rejected authentication (unauthorized)")
+                throw AdbConnectException("Connection failed: $message")
+            }
 
             val connectionString = parseConnectionString(String(message.payload))
             val version = message.arg0
@@ -131,7 +143,7 @@ internal class AdbConnection internal constructor(
                     .map { it.split("=") }
                     .mapNotNull { if (it.size != 2) null else it[0] to it[1] }
                     .toMap()
-            if ("features" !in keyValues) throw IOException("Failed to parse features from connection string: $connectionString")
+            if ("features" !in keyValues) throw AdbConnectException("Failed to parse features from connection string: $connectionString")
             val features = keyValues.getValue("features").split(",").toSet()
             return ConnectionString(features)
         }
