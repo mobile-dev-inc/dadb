@@ -22,6 +22,7 @@ import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.BeforeTest
+import kotlin.test.assertFailsWith
 
 internal class MessageQueueTest : BaseConcurrencyTest() {
 
@@ -46,6 +47,28 @@ internal class MessageQueueTest : BaseConcurrencyTest() {
 
         take(0, 0)
         take(1, 0)
+    }
+
+    @Test
+    fun startListening_rejectsLocalIdAlreadyInUse() {
+        // Two streams listening on the same localId share a single queues entry.
+        // The first one to close removes that entry and the survivor's next
+        // take() dies with "Not listening for localId", even though it was
+        // never closed. Registering a duplicate must fail loudly instead.
+        assertFailsWith<IllegalStateException> {
+            messageQueue.startListening(0)
+        }
+    }
+
+    @Test
+    fun take_afterStopListening_throwsAdbStreamClosed() {
+        messageQueue.stopListening(1)
+
+        // A stream that is gone should surface as the graceful AdbStreamClosed
+        // (which callers already handle), not IllegalStateException.
+        assertFailsWith<AdbStreamClosed> {
+            messageQueue.take(1, 0)
+        }
     }
 
     @Test
