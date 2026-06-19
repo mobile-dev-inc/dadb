@@ -19,6 +19,7 @@ package dadb
 
 import okio.Sink
 import okio.buffer
+import java.io.IOException
 import java.nio.ByteBuffer
 
 internal class AdbWriter(sink: Sink) : AutoCloseable {
@@ -73,24 +74,31 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
             length: Int
     ) {
         log { "(${Thread.currentThread().name}) > ${AdbMessage(command, arg0, arg1, length, 0, 0, payload ?: ByteArray(0))}" }
-        synchronized(bufferedSink) {
-            bufferedSink.apply {
-                writeIntLe(command)
-                writeIntLe(arg0)
-                writeIntLe(arg1)
-                if (payload == null) {
-                    writeIntLe(0)
-                    writeIntLe(0)
-                } else {
-                    writeIntLe(length)
-                    writeIntLe(payloadChecksum(payload))
+        try {
+            synchronized(bufferedSink) {
+                bufferedSink.apply {
+                    writeIntLe(command)
+                    writeIntLe(arg0)
+                    writeIntLe(arg1)
+                    if (payload == null) {
+                        writeIntLe(0)
+                        writeIntLe(0)
+                    } else {
+                        writeIntLe(length)
+                        writeIntLe(payloadChecksum(payload))
+                    }
+                    writeIntLe(command xor -0x1)
+                    if (payload != null) {
+                        write(payload, offset, length)
+                    }
+                    flush()
                 }
-                writeIntLe(command xor -0x1)
-                if (payload != null) {
-                    write(payload, offset, length)
-                }
-                flush()
             }
+        } catch (e: IOException) {
+            // A failed socket write means the transport is gone: okio's write-timeout firing on a
+            // wedged adbd, or an EOF/RST mid-write. Surface it as a typed AdbException here, the single
+            // funnel for every write, so no raw IOException leaks out of a write.
+            throw AdbConnectionClosedException("Connection lost while writing to device", e)
         }
     }
 
