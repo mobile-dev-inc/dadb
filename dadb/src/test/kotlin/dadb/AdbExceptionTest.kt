@@ -30,6 +30,7 @@ internal class AdbExceptionTest {
             AdbAuthException("x"),
             AdbStreamOpenException("shell:", "x"),
             AdbConnectionClosedException("x"),
+            AdbTimeoutException("x"),
             AdbProtocolException("x"),
         )
         exceptions.forEach { assertThat(it).isInstanceOf(IOException::class.java) }

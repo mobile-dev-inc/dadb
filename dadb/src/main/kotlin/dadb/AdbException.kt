@@ -18,6 +18,7 @@
 package dadb
 
 import java.io.IOException
+import java.net.SocketTimeoutException
 
 /**
  * Root of all dadb transport/connection failures. Extends [IOException] because these are genuine,
@@ -46,6 +47,16 @@ class AdbStreamOpenException(
  *  but the operation MAY have partially executed; re-check state before retrying non-idempotent work. */
 class AdbConnectionClosedException(message: String, cause: Throwable? = null) : AdbException(message, cause)
 
+/** An operation exceeded its deadline with adbd unresponsive: a read past socketTimeout, or a write
+ *  past the write timeout (okio closes the socket on expiry). Distinct from a peer-driven EOF/RST.
+ *  Reconnect; like a dropped connection the operation may have partially executed. */
+class AdbTimeoutException(message: String, cause: Throwable? = null) : AdbException(message, cause)
+
 /** The peer sent a malformed or unexpected apacket (desync). No reliable way to re-sync — the
  *  connection must be closed and re-established. */
 class AdbProtocolException(message: String, cause: Throwable? = null) : AdbException(message, cause)
+
+/** True if a SocketTimeoutException is anywhere in this throwable's cause chain. The write timeout
+ *  arrives raw from okio; the read timeout arrives wrapped through the message queue. */
+internal fun Throwable.causedByTimeout(): Boolean =
+    generateSequence(this) { it.cause }.any { it is SocketTimeoutException }
