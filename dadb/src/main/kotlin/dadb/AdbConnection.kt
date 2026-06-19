@@ -25,6 +25,7 @@ import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
 import java.io.IOException
 import java.net.Socket
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 internal class AdbConnection internal constructor(
@@ -80,9 +81,23 @@ internal class AdbConnection internal constructor(
 
     companion object {
 
-        fun connect(socket: Socket, keyPair: AdbKeyPair? = null): AdbConnection {
+        // A blocking socket write has no timeout of its own: Socket.setSoTimeout (Dadb's
+        // socketTimeout) bounds reads only, so a wedged adbd that stops draining the socket would
+        // block every write forever. We always bound writes with okio's socket sink timeout. okio
+        // chunks each write and arms a SocketAsyncTimeout per chunk, so this is a per-progress stall
+        // deadline (a healthy large push resets it each chunk, not a total-transfer cap), and on
+        // expiry SocketAsyncTimeout.timedOut() closes the socket -> the write throws
+        // SocketTimeoutException and the connection is rebuilt on the next op. 10s matches OkHttp's
+        // default write timeout; on a healthy connection a chunk drains in milliseconds, so this only
+        // fires when the connection is genuinely wedged. It is a correctness guard, not a tunable.
+        internal const val WRITE_TIMEOUT_MILLIS = 10_000L
+
+        // writeTimeoutMillis is internal-only (tests inject a short value); it is NOT exposed on the
+        // public Dadb.create API, which always uses WRITE_TIMEOUT_MILLIS.
+        fun connect(socket: Socket, keyPair: AdbKeyPair? = null, writeTimeoutMillis: Long = WRITE_TIMEOUT_MILLIS): AdbConnection {
             val source = socket.source()
             val sink = socket.sink()
+            sink.timeout().timeout(writeTimeoutMillis, TimeUnit.MILLISECONDS)
             return connect(source, sink, keyPair, socket)
         }
 
