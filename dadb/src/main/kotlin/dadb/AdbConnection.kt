@@ -25,6 +25,7 @@ import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
 import java.io.IOException
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -60,7 +61,7 @@ internal class AdbConnection internal constructor(
         } catch (e: IOException) {
             // Raw socket fault while opening: a timeout (adbd unresponsive) vs the connection dying.
             messageQueue.stopListening(localId)
-            throw if (e.causedByTimeout()) AdbTimeoutException("Timed out opening stream: $destination", e)
+            throw if (e is SocketTimeoutException) AdbTimeoutException("Timed out opening stream: $destination", e)
                   else AdbConnectionClosedException("Connection lost while opening stream: $destination", e)
         } catch (e: Throwable) {
             messageQueue.stopListening(localId)

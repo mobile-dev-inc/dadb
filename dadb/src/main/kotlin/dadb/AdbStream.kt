@@ -19,6 +19,7 @@ package dadb
 
 import okio.*
 import java.lang.Integer.min
+import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
 
 interface AdbStream : AutoCloseable {
@@ -125,7 +126,7 @@ internal class AdbStreamImpl internal constructor(
             // Mid-stream fault: a timeout (adbd unresponsive) vs the transport dying. Either way the
             // stream is done.
             close()
-            throw if (e.causedByTimeout()) AdbTimeoutException("Read timed out on stream $localId; device unresponsive", e)
+            throw if (e is SocketTimeoutException) AdbTimeoutException("Read timed out on stream $localId; device unresponsive", e)
                   else AdbConnectionClosedException("Connection lost while reading stream $localId", e)
         }
     }

@@ -20,6 +20,7 @@ package dadb
 import okio.Sink
 import okio.buffer
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
 
 internal class AdbWriter(sink: Sink) : AutoCloseable {
@@ -98,7 +99,7 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
             // A failed socket write means the transport is gone. A timeout is a stall (adbd stopped
             // draining); anything else is a dropped connection. This is the single funnel for every
             // write, so no raw IOException leaks out either way.
-            throw if (e.causedByTimeout()) AdbTimeoutException("Write timed out; device unresponsive", e)
+            throw if (e is SocketTimeoutException) AdbTimeoutException("Write timed out; device unresponsive", e)
                   else AdbConnectionClosedException("Connection lost while writing to device", e)
         }
     }

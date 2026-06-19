@@ -18,7 +18,6 @@
 package dadb
 
 import java.io.IOException
-import java.net.SocketTimeoutException
 
 /**
  * Root of all dadb transport/connection failures. Extends [IOException] because these are genuine,
@@ -55,9 +54,3 @@ class AdbTimeoutException(message: String, cause: Throwable? = null) : AdbExcept
 /** The peer sent a malformed or unexpected apacket (desync). No reliable way to re-sync — the
  *  connection must be closed and re-established. */
 class AdbProtocolException(message: String, cause: Throwable? = null) : AdbException(message, cause)
-
-/** True if a SocketTimeoutException is anywhere in this throwable's cause chain. Both the write
- *  timeout (okio's socket sink) and the read timeout (SO_TIMEOUT) arrive as a SocketTimeoutException;
- *  the chain walk keeps the check robust if a layer ever wraps one on the way out. */
-internal fun Throwable.causedByTimeout(): Boolean =
-    generateSequence(this) { it.cause }.any { it is SocketTimeoutException }
