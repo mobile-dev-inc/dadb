@@ -7,6 +7,9 @@
 * **Breaking:** a connection dropped mid-stream now throws `AdbConnectionClosedException` instead of presenting as a clean end-of-stream.
 * **Breaking:** a read or write that exceeds its timeout now throws `AdbTimeoutException` instead of a raw `SocketTimeoutException`.
 * `pmInstall` (the non-`cmd` install path) now checks the `pm install` result instead of ignoring it.
+* Fixed stream local-id collisions that surfaced as `Not listening for localId` and could tear down a live stream's state; stream ids are now sequential, like AOSP's adb client.
+* Socket writes are now bounded by a write timeout, so a wedged device fails fast instead of blocking a write indefinitely; the connection is rebuilt on the next operation.
+* A stream read parked in `MessageQueue.take()` no longer hangs when the connection closes or a read fails; it now wakes with the relevant `AdbException`.
 * Added opt-in result helpers — `onSuccess`/`onFailure`/`orThrow` on each `…Result` type. `orThrow` raises `AdbOperationFailedException`, which is **not** an `AdbException`, so a transport-level `catch (AdbException)` won't catch an opted-in operation-failure throw.
 
 ### 1.2.10
