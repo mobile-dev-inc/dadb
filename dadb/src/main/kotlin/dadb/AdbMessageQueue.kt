@@ -17,6 +17,8 @@
 
 package dadb
 
+import java.io.IOException
+
 internal class AdbMessageQueue(private val adbReader: AdbReader) : AutoCloseable, MessageQueue<AdbMessage>() {
 
     override fun readMessage() = adbReader.readMessage()
@@ -25,7 +27,12 @@ internal class AdbMessageQueue(private val adbReader: AdbReader) : AutoCloseable
 
     override fun getCommand(message: AdbMessage) = message.command
 
-    override fun close() = adbReader.close()
+    override fun close() {
+        // Wake parked takers before closing the reader, so they fail with this IOException instead of
+        // stranding in await() or waking to re-read the closed reader.
+        signalClosed(IOException("Connection closed"))
+        adbReader.close()
+    }
 
     override fun isCloseCommand(message: AdbMessage) = message.command == Constants.CMD_CLSE
 }
