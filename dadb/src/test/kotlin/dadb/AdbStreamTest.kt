@@ -19,6 +19,9 @@ package dadb
 
 import com.google.common.truth.Truth
 import okio.Buffer
+import okio.Source
+import okio.Timeout
+import java.net.SocketTimeoutException
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -55,6 +58,22 @@ internal class AdbStreamTest {
         val stream = AdbStreamImpl(messageQueue, AdbWriter(Buffer()), 1024, 1, 2)
 
         assertFailsWith<AdbConnectionClosedException> { stream.source.readByteArray() }
+    }
+
+    @Test
+    fun readTimeoutThrowsAdbTimeout() {
+        // Reader whose socket read trips SO_TIMEOUT instead of returning data or EOF: a stall, which
+        // surfaces as AdbTimeoutException rather than AdbConnectionClosedException.
+        val timingOutReader = AdbReader(object : Source {
+            override fun read(sink: Buffer, byteCount: Long): Long = throw SocketTimeoutException("Read timed out")
+            override fun timeout(): Timeout = Timeout.NONE
+            override fun close() {}
+        })
+        val messageQueue = AdbMessageQueue(timingOutReader)
+        messageQueue.startListening(1)
+        val stream = AdbStreamImpl(messageQueue, AdbWriter(Buffer()), 1024, 1, 2)
+
+        assertFailsWith<AdbTimeoutException> { stream.source.readByteArray() }
     }
 
     private fun createAdbReader(localId: Int, remoteId: Int, writePayload: ByteArray): AdbReader {

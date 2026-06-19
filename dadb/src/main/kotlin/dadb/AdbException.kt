@@ -56,7 +56,8 @@ class AdbTimeoutException(message: String, cause: Throwable? = null) : AdbExcept
  *  connection must be closed and re-established. */
 class AdbProtocolException(message: String, cause: Throwable? = null) : AdbException(message, cause)
 
-/** True if a SocketTimeoutException is anywhere in this throwable's cause chain. The write timeout
- *  arrives raw from okio; the read timeout arrives wrapped through the message queue. */
+/** True if a SocketTimeoutException is anywhere in this throwable's cause chain. Both the write
+ *  timeout (okio's socket sink) and the read timeout (SO_TIMEOUT) arrive as a SocketTimeoutException;
+ *  the chain walk keeps the check robust if a layer ever wraps one on the way out. */
 internal fun Throwable.causedByTimeout(): Boolean =
     generateSequence(this) { it.cause }.any { it is SocketTimeoutException }
