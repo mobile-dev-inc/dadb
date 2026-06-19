@@ -18,6 +18,7 @@
 package dadb
 
 import org.jetbrains.annotations.TestOnly
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
 import kotlin.jvm.Throws
@@ -87,7 +88,13 @@ internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
         val socketAddress = InetSocketAddress(host, port)
         val socket = Socket()
         socket.soTimeout = socketTimeout
-        socket.connect(socketAddress, connectTimeout)
+        try {
+            socket.connect(socketAddress, connectTimeout)
+        } catch (e: IOException) {
+            // A failed TCP connect (refused / unreachable / connect timeout) means nothing was
+            // established. Surface it as a typed AdbException, not a raw java.net exception.
+            throw AdbConnectException("Failed to connect to $host:$port", e)
+        }
         if (keepAlive) {
             socket.keepAlive = true
         }

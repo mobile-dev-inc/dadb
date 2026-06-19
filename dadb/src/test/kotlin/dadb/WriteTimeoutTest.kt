@@ -25,7 +25,6 @@ import java.io.Closeable
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
-import java.net.SocketTimeoutException
 import java.time.Duration
 import java.util.Collections
 import kotlin.concurrent.thread
@@ -108,7 +107,7 @@ class WriteTimeoutTest {
     }
 
     @Test
-    fun `a wedged write fails fast with SocketTimeoutException and the connection recovers`() {
+    fun `a wedged write fails fast with AdbTimeoutException and the connection recovers`() {
         Relay(targetPort = 5555).use { relay ->
             // writeTimeoutMillis is the internal test seam; production always uses WRITE_TIMEOUT_MILLIS.
             val dadb = DadbImpl(
@@ -126,7 +125,9 @@ class WriteTimeoutTest {
                 // Wedge: relay stops draining the client side, so a large write stalls.
                 relay.wedgeWrites()
                 val bigCommand = "x".repeat(32 * 1024 * 1024) // overflows the OS socket buffers (incl. larger Linux defaults)
-                assertThrows<SocketTimeoutException> {
+                // okio's write timeout fires on the stalled write and surfaces as a typed timeout,
+                // not a raw SocketTimeoutException.
+                assertThrows<AdbTimeoutException> {
                     assertTimeoutPreemptively(Duration.ofSeconds(8)) { dadb.shell(bigCommand) }
                 }
 
@@ -150,7 +151,8 @@ class WriteTimeoutTest {
                 // Wedge: adbd's responses stop reaching dadb, so the next op's read blocks until
                 // SO_TIMEOUT fires (the connection stays open, so this is a timeout, not an EOF).
                 relay.wedgeReads()
-                assertThrows<SocketTimeoutException> {
+                // SO_TIMEOUT trips the read and surfaces as a typed timeout.
+                assertThrows<AdbTimeoutException> {
                     assertTimeoutPreemptively(Duration.ofSeconds(8)) { dadb.shell("echo hi") }
                 }
             } finally {
