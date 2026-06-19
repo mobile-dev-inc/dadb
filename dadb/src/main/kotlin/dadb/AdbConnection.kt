@@ -25,8 +25,8 @@ import org.jetbrains.annotations.TestOnly
 import java.io.Closeable
 import java.io.IOException
 import java.net.Socket
-import java.util.*
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 internal class AdbConnection internal constructor(
         adbReader: AdbReader,
@@ -37,7 +37,7 @@ internal class AdbConnection internal constructor(
         private val maxPayloadSize: Int
 ) : AutoCloseable {
 
-    private val random = Random()
+    private val nextLocalId = AtomicInteger(0)
     private val messageQueue = AdbMessageQueue(adbReader)
 
     @Throws(IOException::class)
@@ -59,8 +59,11 @@ internal class AdbConnection internal constructor(
         return supportedFeatures.contains(feature)
     }
 
+    // Sequential like AOSP's adb client. Random ints can collide with an ID
+    // already in use; the colliding stream's close then destroys the live
+    // stream's message queue ("Not listening for localId").
     private fun newId(): Int {
-        return random.nextInt()
+        return nextLocalId.incrementAndGet()
     }
 
     @TestOnly
