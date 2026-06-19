@@ -95,10 +95,11 @@ internal class AdbWriter(sink: Sink) : AutoCloseable {
                 }
             }
         } catch (e: IOException) {
-            // A failed socket write means the transport is gone: okio's write-timeout firing on a
-            // wedged adbd, or an EOF/RST mid-write. Surface it as a typed AdbException here, the single
-            // funnel for every write, so no raw IOException leaks out of a write.
-            throw AdbConnectionClosedException("Connection lost while writing to device", e)
+            // A failed socket write means the transport is gone. A timeout is a stall (adbd stopped
+            // draining); anything else is a dropped connection. This is the single funnel for every
+            // write, so no raw IOException leaks out either way.
+            throw if (e.causedByTimeout()) AdbTimeoutException("Write timed out; device unresponsive", e)
+                  else AdbConnectionClosedException("Connection lost while writing to device", e)
         }
     }
 

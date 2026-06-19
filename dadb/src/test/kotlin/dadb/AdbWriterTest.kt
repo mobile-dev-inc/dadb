@@ -37,23 +37,22 @@ internal class AdbWriterTest {
     }
 
     @Test
-    fun payloadWrite_onWriteTimeout_surfacesAsAdbException() {
-        // The wedged-push path: AdbStream.sink.flush() -> writeWrite(...). Before the fix this leaked
-        // okio's raw SocketTimeoutException past push()/install(), which are declared @Throws(AdbException).
+    fun payloadWrite_onWriteTimeout_surfacesAsAdbTimeout() {
+        // The wedged-push path: AdbStream.sink.flush() -> writeWrite(...). okio's write timeout on a
+        // stalled adbd is a timeout, not a dropped connection, so it surfaces as AdbTimeoutException.
         val cause = SocketTimeoutException("timeout")
         val writer = AdbWriter(ThrowingSink(cause))
 
-        val thrown = assertFailsWith<AdbConnectionClosedException> {
+        val thrown = assertFailsWith<AdbTimeoutException> {
             writer.writeWrite(localId = 1, remoteId = 2, payload = ByteArray(8), offset = 0, length = 8)
         }
-        assertThat(thrown).isInstanceOf(AdbException::class.java)
         assertThat(thrown.cause).isSameInstanceAs(cause)
     }
 
     @Test
-    fun ackWrite_onTransportFault_surfacesAsAdbException() {
-        // The read-path ack: AdbStream.source.read() -> writeOkay(...) sits outside nextMessage's
-        // catch, so it leaked raw too. Same single funnel, same guarantee.
+    fun ackWrite_onNonTimeoutFault_surfacesAsConnectionClosed() {
+        // A non-timeout write fault (e.g. a broken pipe) is a dropped connection, not a stall, so it
+        // surfaces as AdbConnectionClosedException. Either way no raw IOException leaves the funnel.
         val writer = AdbWriter(ThrowingSink(IOException("broken pipe")))
 
         assertFailsWith<AdbConnectionClosedException> {
