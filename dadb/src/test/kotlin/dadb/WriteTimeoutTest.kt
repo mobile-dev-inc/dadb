@@ -108,7 +108,7 @@ class WriteTimeoutTest {
     }
 
     @Test
-    fun `a wedged write fails fast with SocketTimeoutException and the connection recovers`() {
+    fun `a wedged write fails fast with AdbConnectionClosedException and the connection recovers`() {
         Relay(targetPort = 5555).use { relay ->
             // writeTimeoutMillis is the internal test seam; production always uses WRITE_TIMEOUT_MILLIS.
             val dadb = DadbImpl(
@@ -126,9 +126,12 @@ class WriteTimeoutTest {
                 // Wedge: relay stops draining the client side, so a large write stalls.
                 relay.wedgeWrites()
                 val bigCommand = "x".repeat(32 * 1024 * 1024) // overflows the OS socket buffers (incl. larger Linux defaults)
-                assertThrows<SocketTimeoutException> {
+                // The error model surfaces the wedged write as a typed transport fault, carrying the
+                // underlying okio SocketTimeoutException as its cause (no bare IOException leaks).
+                val thrown = assertThrows<AdbConnectionClosedException> {
                     assertTimeoutPreemptively(Duration.ofSeconds(8)) { dadb.shell(bigCommand) }
                 }
+                assertThat(thrown.causedBySocketTimeout()).isTrue()
 
                 // The timed-out write closed the socket; once forwarding resumes, the next op rebuilds.
                 relay.unwedgeWrites()
@@ -150,12 +153,20 @@ class WriteTimeoutTest {
                 // Wedge: adbd's responses stop reaching dadb, so the next op's read blocks until
                 // SO_TIMEOUT fires (the connection stays open, so this is a timeout, not an EOF).
                 relay.wedgeReads()
-                assertThrows<SocketTimeoutException> {
+                // SO_TIMEOUT trips the read; the error model surfaces it as a typed transport fault
+                // carrying the SocketTimeoutException as its cause.
+                val thrown = assertThrows<AdbConnectionClosedException> {
                     assertTimeoutPreemptively(Duration.ofSeconds(8)) { dadb.shell("echo hi") }
                 }
+                assertThat(thrown.causedBySocketTimeout()).isTrue()
             } finally {
                 runCatching { dadb.close() }
             }
         }
     }
 }
+
+// A wedged read/write is bounded by a SocketTimeoutException deep down; the error model wraps it on
+// the way out, so assert on the cause chain rather than the surfaced type carrying it directly.
+private fun Throwable.causedBySocketTimeout(): Boolean =
+    generateSequence(this) { it.cause }.any { it is SocketTimeoutException }
