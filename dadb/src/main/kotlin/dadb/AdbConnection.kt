@@ -58,9 +58,10 @@ internal class AdbConnection internal constructor(
             messageQueue.stopListening(localId)
             throw e
         } catch (e: IOException) {
-            // Raw socket fault (EOF/RST) while opening: the connection died mid-handshake.
+            // Raw socket fault while opening: a timeout (adbd unresponsive) vs the connection dying.
             messageQueue.stopListening(localId)
-            throw AdbConnectionClosedException("Connection lost while opening stream: $destination", e)
+            throw if (e.causedByTimeout()) AdbTimeoutException("Timed out opening stream: $destination", e)
+                  else AdbConnectionClosedException("Connection lost while opening stream: $destination", e)
         } catch (e: Throwable) {
             messageQueue.stopListening(localId)
             throw e

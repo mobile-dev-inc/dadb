@@ -122,9 +122,11 @@ internal class AdbStreamImpl internal constructor(
             close()
             null
         } catch (e: IOException) {
-            // Real socket fault (EOF/RST) mid-stream: the transport died, not a clean close.
+            // Mid-stream fault: a timeout (adbd unresponsive) vs the transport dying. Either way the
+            // stream is done.
             close()
-            throw AdbConnectionClosedException("Connection lost while reading stream $localId", e)
+            throw if (e.causedByTimeout()) AdbTimeoutException("Read timed out on stream $localId; device unresponsive", e)
+                  else AdbConnectionClosedException("Connection lost while reading stream $localId", e)
         }
     }
 
