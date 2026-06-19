@@ -19,7 +19,9 @@ package dadb
 
 import com.google.common.truth.Truth.assertThat
 import java.io.IOException
+import java.net.ServerSocket
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 
 internal class AdbExceptionTest {
 
@@ -46,5 +48,16 @@ internal class AdbExceptionTest {
     fun preservesCause() {
         val cause = IOException("socket reset")
         assertThat(AdbConnectException("x", cause).cause).isSameInstanceAs(cause)
+    }
+
+    @Test
+    fun refusedConnectThrowsAdbConnectException() {
+        // Bind an ephemeral port then release it: nothing is listening, so the TCP connect is refused.
+        val closedPort = ServerSocket(0).use { it.localPort }
+        val dadb = DadbImpl(host = "localhost", port = closedPort, connectTimeout = 1000, socketTimeout = 1000)
+
+        // A refused connect must surface as the typed AdbConnectException, not a raw java.net exception.
+        val thrown = assertFailsWith<AdbConnectException> { dadb.shell("echo hi") }
+        assertThat(thrown.cause).isNotNull()
     }
 }
