@@ -18,6 +18,7 @@
 package dadb
 
 import org.jetbrains.annotations.TestOnly
+import java.io.IOException
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -31,22 +32,44 @@ internal abstract class MessageQueue<V> {
     private val queues = ConcurrentHashMap<Int, ConcurrentHashMap<Int, Queue<V>>>()
     private val openStreams = ConcurrentHashMap<Int, Boolean>().keySet(true)
 
+    // Terminal close marker, guarded by queueLock and set once by signalClosed(). A transient read
+    // failure does NOT set this — those stay per-call and retryable. Set only on close (when the
+    // socket also closes), so it stays in step with DadbImpl rebuilding the connection on the next op.
+    private var closedCause: IOException? = null
+
     fun take(localId: Int, command: Int): V {
         while (true) {
             queueLock.lock {
+                // Closed: fail fast rather than loop into a read on a dead reader. Fresh exception so
+                // each caller keeps its own stack.
+                closedCause?.let { throw IOException("MessageQueue closed", it) }
                 poll(localId, command)?.let { return it }
                 readLock.tryLock ({
-                    queueLock.unlock()
-                    read()
-                    queueLock.lock()
-                    queueCond.signalAll()
+                    queueLock.unlock() // released so peers can poll/queue while we read
+                    try {
+                        read()
+                    } finally {
+                        // Signal on every read() outcome, not just success: a throwing read must still
+                        // wake parked takers. The missing signal on this path was the lost-wakeup bug.
+                        // Each woken taker retries and sees the failure itself — per-call, not sticky.
+                        queueLock.lock()
+                        queueCond.signalAll()
+                    }
                 }) { queueCond.await() }
             }
         }
     }
 
+    /** Mark the queue closed and wake every parked taker so they fail fast. Call before closing the reader. */
+    protected fun signalClosed(cause: IOException) {
+        queueLock.lock {
+            if (closedCause == null) closedCause = cause
+            queueCond.signalAll()
+        }
+    }
+
     fun startListening(localId: Int) {
-        openStreams.add(localId)
+        check(openStreams.add(localId)) { "Already listening for localId: $localId" }
         queues.putIfAbsent(localId, ConcurrentHashMap())
     }
 
@@ -70,7 +93,7 @@ internal abstract class MessageQueue<V> {
     protected abstract fun isCloseCommand(message: V): Boolean
 
     private fun poll(localId: Int, command: Int): V? {
-        val streamQueues = queues[localId] ?: throw IllegalStateException("Not listening for localId: $localId")
+        val streamQueues = queues[localId] ?: throw AdbStreamClosed(localId)
         val message = streamQueues[command]?.poll()
         if (message == null && !openStreams.contains(localId)) {
             throw AdbStreamClosed(localId)

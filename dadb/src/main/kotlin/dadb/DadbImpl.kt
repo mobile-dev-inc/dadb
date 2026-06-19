@@ -30,6 +30,8 @@ internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
         private val connectTimeout: Int = 0,
         private val socketTimeout: Int = 0,
         private val keepAlive: Boolean = false,
+        // Internal-only: tests inject a short write timeout. Not exposed on the public Dadb.create API.
+        private val writeTimeoutMillis: Long = AdbConnection.WRITE_TIMEOUT_MILLIS,
 ) : Dadb {
 
     init {
@@ -44,6 +46,10 @@ internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
 
         if (socketTimeout < 0) {
             throw IllegalArgumentException("socketTimeout must be >= 0")
+        }
+
+        if (writeTimeoutMillis < 0) {
+            throw IllegalArgumentException("writeTimeoutMillis must be >= 0")
         }
 
     }
@@ -85,7 +91,7 @@ internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
         if (keepAlive) {
             socket.keepAlive = true
         }
-        val adbConnection = AdbConnection.connect(socket, keyPair)
+        val adbConnection = AdbConnection.connect(socket, keyPair, writeTimeoutMillis)
         return adbConnection to socket
     }
 }
