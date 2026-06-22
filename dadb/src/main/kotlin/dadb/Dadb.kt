@@ -22,6 +22,7 @@ import dadb.forwarding.TcpForwarder
 import java.io.File
 import java.nio.file.Files
 import okio.*
+import java.nio.file.FileSystems
 
 interface Dadb : AutoCloseable {
 
@@ -239,6 +240,10 @@ interface Dadb : AutoCloseable {
 
         private const val MIN_EMULATOR_PORT = 5555
         private const val MAX_EMULATOR_PORT = 5683
+        private const val DEFAULT_MODE = 0b110100100
+        private val isPosixFs: Boolean by lazy {
+            FileSystems.getDefault().supportedFileAttributeViews().contains("posix")
+        }
 
         @JvmStatic
         @JvmOverloads
@@ -299,7 +304,11 @@ interface Dadb : AutoCloseable {
         }
 
         private fun readMode(file: File): Int {
-            return Files.getAttribute(file.toPath(), "unix:mode") as? Int ?: throw RuntimeException("Unable to read file mode")
+            if (!isPosixFs) {
+                return DEFAULT_MODE
+            }
+            val mode = Files.getAttribute(file.toPath(), "unix:mode") as? Int
+            return mode ?: DEFAULT_MODE
         }
     }
 }
