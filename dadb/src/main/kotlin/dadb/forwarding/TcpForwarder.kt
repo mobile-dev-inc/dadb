@@ -20,7 +20,7 @@ import kotlin.concurrent.thread
 internal class TcpForwarder(
     private val dadb: Dadb,
     private val hostPort: Int,
-    private val targetPort: Int,
+    private val targetPort: String,
 ) : AutoCloseable {
 
     private var state: State = State.STOPPED
@@ -61,7 +61,7 @@ internal class TcpForwarder(
             val client = serverRef.accept()
 
             clientExecutor?.execute {
-                val adbStream = dadb.open("tcp:$targetPort")
+                val adbStream = dadb.open(targetPort)
 
                 val readerThread = thread {
                     forward(
